@@ -3,87 +3,85 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 7,
   projectPath: "PREDICTION_MARKET",
-  explanation: `## Lesson 7 — Structured JSON Responses
+  explanation: `## Lesson 7 — \`Address\` & \`gl.message.sender_address\`
 
-Plain YES/NO is useful, but PredictX benefits from richer data: we also want the model's **confidence** level so we can reject low-confidence resolutions. GenLayer supports this with \`response_format="json"\`.
+\`gl.message.sender_address\` is the wallet address of whoever called the current method. In \`__init__\`, it is the deployer. In \`create_market\`, it is the person creating the market. You can store it, compare it, or return it just like any other \`Address\` value.
 
-When you pass \`response_format="json"\`, \`exec_prompt\` returns a Python \`dict\` instead of a string. Structure the prompt to describe the exact JSON schema you expect:
+### Writing to a TreeMap
+
+Assigning to a \`TreeMap\` entry uses standard dict-style syntax:
 
 \`\`\`python
-prompt = """Has ETH exceeded $10,000 by December 31, 2025?
-Respond with JSON: {"verdict": "YES or NO", "confidence": 0-100}"""
-
-result = gl.nondet.exec_prompt(prompt, response_format="json")
-self.resolution = result["verdict"]
-self.confidence = int(result["confidence"])
+self.market_creators[market_id] = gl.message.sender_address
+self.market_questions[market_id] = question
+self.market_statuses[market_id] = "active"
 \`\`\`
 
-The consensus layer compares the structured output across validators, so all nodes must agree on both fields. Describe the schema precisely in the prompt — vague instructions lead to varying structures and failed consensus.
+### Stub with a hardcoded ID
 
-Adding a \`confidence\` field opens the door to quality gates: in Lesson 10 you'll require confidence ≥ 70 before storing a resolution, preventing the market from settling on uncertain AI outputs. This is a powerful pattern for production prediction markets.`,
+This lesson adds a \`create_market\` stub that uses the hard-coded ID \`"0"\` for now. That means every call to \`create_market\` overwrites the same slot — which is intentional. The real counter-based ID generation comes in Lesson 10. For now, focus on correctly writing all five fields into their TreeMaps and returning the ID.
+
+\`\`\`python
+@gl.public.write
+def create_market(self, question: str, outcome_a: str, outcome_b: str) -> str:
+    market_id = "0"
+    self.market_creators[market_id] = gl.message.sender_address
+    self.market_questions[market_id] = question
+    self.market_outcome_a[market_id] = outcome_a
+    self.market_outcome_b[market_id] = outcome_b
+    self.market_statuses[market_id] = "active"
+    return market_id
+\`\`\`
+
+Return type is \`str\` — the caller receives the ID of the newly created market.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address, u256
+
+from genlayer import *
 
 
-class PredictionMarket(gl.Contract):
-    question: str
-    bet_count: int
-    last_bettor: Address
+class PredictX(gl.Contract):
     owner: Address
-    market_id: u256
-    is_open: bool
-    resolution: str
-    confidence: int
+    platform_name: str
+    platform_description: str
+    market_questions: TreeMap[str, str]
+    market_outcome_a: TreeMap[str, str]
+    market_outcome_b: TreeMap[str, str]
+    market_creators: TreeMap[str, Address]
+    market_statuses: TreeMap[str, str]
+    market_count: u256
 
-    def __init__(self, question: str, market_id: u256) -> None:
-        self.question = question
-        self.bet_count = 0
+    def __init__(self) -> None:
         self.owner = gl.message.sender_address
-        self.market_id = market_id
-        self.is_open = True
-        self.resolution = ""
-        self.confidence = 0
+        self.platform_name = "PredictX"
+        self.platform_description = "A GenLayer prediction market that uses AI-assisted resolution."
 
     @gl.public.view
-    def get_question(self) -> str:
-        return self.question
+    def get_platform_name(self) -> str:
+        return self.platform_name
+
+    @gl.public.view
+    def get_platform_description(self) -> str:
+        return self.platform_description
 
     @gl.public.view
     def get_owner(self) -> str:
-        return str(self.owner)
-
-    @gl.public.write
-    def place_bet(self, outcome: str) -> None:
-        if outcome not in ["YES", "NO"]:
-            raise gl.vm.UserError("outcome must be YES or NO")
-        self.bet_count += 1
-        self.last_bettor = gl.message.sender_address
+        return self.owner.as_hex
 
     @gl.public.view
-    def get_bet_count(self) -> int:
-        return self.bet_count
+    def get_contract_summary(self) -> str:
+        return self.platform_name + ": " + self.platform_description
 
     @gl.public.write
-    def cancel(self) -> None:
-        if gl.message.sender_address != self.owner:
-            raise gl.vm.UserError("unauthorized")
-        if not self.is_open:
-            raise gl.vm.UserError("already cancelled")
-        self.is_open = False
-
-    @gl.public.write
-    def resolve(self) -> None:
-        # TODO: use response_format="json" to get {"verdict": "YES/NO", "confidence": 0-100}
-        # Store result["verdict"] in self.resolution and int(result["confidence"]) in self.confidence
-        prompt = "Has ETH exceeded $10,000 by December 31, 2025? Answer YES or NO only."
-        self.resolution = gl.nondet.exec_prompt(prompt).strip().upper()
+    def update_platform_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update description"
+        assert len(new_description) > 0, "Description cannot be empty"
+        self.platform_description = new_description
 `,
-  task: "Update `resolve()` to use `response_format=\"json\"` asking for `{\"verdict\": \"YES or NO\", \"confidence\": 0-100}`, then store both fields in `self.resolution` and `self.confidence`.",
+  task: "Add a `@gl.public.write` method `create_market(self, question: str, outcome_a: str, outcome_b: str) -> str` that sets `market_id = \"0\"`, stores the creator address, question, outcome_a, outcome_b, and status `\"active\"` in the respective TreeMaps, then returns `market_id`.",
   hints: [
-    "Add `response_format=\"json\"` as the second argument to `exec_prompt` — the return value is a dict, not a string.",
-    "Update the prompt to describe the exact JSON structure: `'Respond with JSON: {\"verdict\": \"YES or NO\", \"confidence\": 0-100}'`",
-    "`result = gl.nondet.exec_prompt(prompt, response_format=\"json\"); self.resolution = result[\"verdict\"]; self.confidence = int(result[\"confidence\"])`",
+    "Use `@gl.public.write` and return type `str` (the market ID).",
+    "Store the creator with: `self.market_creators[market_id] = gl.message.sender_address`",
+    "Set the initial status: `self.market_statuses[market_id] = \"active\"` and return `market_id` at the end.",
   ],
 };
 

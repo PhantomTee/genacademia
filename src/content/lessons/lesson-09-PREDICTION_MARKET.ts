@@ -3,101 +3,102 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 9,
   projectPath: "PREDICTION_MARKET",
-  explanation: `## Lesson 9 — gl.nondet.web.get
+  explanation: `## Lesson 9 — \`TreeMap[str, T]\`: Input Validation for Record Creation
 
-An LLM answering purely from training data is unreliable for recent price events. PredictX can do better: \`gl.nondet.web.get(url)\` fetches a live web page and returns its body as a string, giving the AI fresh context to work with.
+When creating on-chain records, validate **all inputs before writing anything**. If any assert fails, the entire transaction reverts — no partial writes occur. This is the fundamental safety guarantee of assert-first patterns.
+
+### Four validation rules for \`create_market\`
+
+1. **Question cannot be empty** — a market with no question is meaningless.
+2. **Outcome A cannot be empty** — both outcomes must be labelled.
+3. **Outcome B cannot be empty** — same reason.
+4. **Outcomes must be different** — a market where both outcomes are identical cannot resolve.
 
 \`\`\`python
-data = gl.nondet.web.get("https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd")
-prompt = (
-    f"Current market data: {data[:1500]}\\n\\n"
-    f"[MARKET QUESTION: {self._safe_text(self.question)}]\\n"
-    "Has this condition been met? "
-    'Respond with JSON: {"verdict": "YES or NO", "confidence": 0-100}'
-)
+assert len(question) > 0, "Question cannot be empty"
+assert len(outcome_a) > 0, "Outcome A cannot be empty"
+assert len(outcome_b) > 0, "Outcome B cannot be empty"
+assert outcome_a != outcome_b, "Outcomes must be different"
 \`\`\`
 
-Key practices:
-- **Truncate the response** with \`[:1500]\` — LLM context windows are finite and large pages waste tokens.
-- **Put data before the question** — most LLMs pay more attention to early context.
-- Store the URL in contract state (\`self.news_source\`) so the owner can update it without redeploying.
+### Placement matters
 
-Like \`exec_prompt\`, \`web.get\` is non-deterministic but consensus-safe — validators fetch the same URL and GenLayer ensures they reach agreement on the content.`,
+All four asserts must come **before** the \`market_id = "0"\` line and any \`self.market_...\` assignments. If validation happens after partial writes, a failed assert would still revert everything — but the ordering makes the code unambiguous about intent and is much easier to audit.
+
+\`\`\`python
+@gl.public.write
+def create_market(self, question: str, outcome_a: str, outcome_b: str, min_stake: u256) -> str:
+    # 1. Validate ALL inputs first
+    assert len(question) > 0, "Question cannot be empty"
+    assert len(outcome_a) > 0, "Outcome A cannot be empty"
+    assert len(outcome_b) > 0, "Outcome B cannot be empty"
+    assert outcome_a != outcome_b, "Outcomes must be different"
+    assert min_stake > u256(0), "Minimum stake must be greater than zero"
+    # 2. Then write state
+    market_id = "0"
+    ...
+\`\`\``,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address, u256
+
+from genlayer import *
 
 
-class PredictionMarket(gl.Contract):
-    question: str
-    bet_count: int
-    last_bettor: Address
+class PredictX(gl.Contract):
     owner: Address
-    market_id: u256
-    is_open: bool
-    resolution: str
-    confidence: int
-    news_source: str
+    platform_name: str
+    platform_description: str
+    market_questions: TreeMap[str, str]
+    market_outcome_a: TreeMap[str, str]
+    market_outcome_b: TreeMap[str, str]
+    market_creators: TreeMap[str, Address]
+    market_statuses: TreeMap[str, str]
+    market_min_stakes: TreeMap[str, u256]
+    market_count: u256
 
-    def __init__(self, question: str, market_id: u256) -> None:
-        self.question = question
-        self.bet_count = 0
+    def __init__(self) -> None:
         self.owner = gl.message.sender_address
-        self.market_id = market_id
-        self.is_open = True
-        self.resolution = ""
-        self.confidence = 0
-        self.news_source = "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd"
+        self.platform_name = "PredictX"
+        self.platform_description = "A GenLayer prediction market that uses AI-assisted resolution."
 
     @gl.public.view
-    def get_question(self) -> str:
-        return self.question
+    def get_platform_name(self) -> str:
+        return self.platform_name
+
+    @gl.public.view
+    def get_platform_description(self) -> str:
+        return self.platform_description
 
     @gl.public.view
     def get_owner(self) -> str:
-        return str(self.owner)
-
-    @gl.public.write
-    def place_bet(self, outcome: str) -> None:
-        if outcome not in ["YES", "NO"]:
-            raise gl.vm.UserError("outcome must be YES or NO")
-        self.bet_count += 1
-        self.last_bettor = gl.message.sender_address
+        return self.owner.as_hex
 
     @gl.public.view
-    def get_bet_count(self) -> int:
-        return self.bet_count
+    def get_contract_summary(self) -> str:
+        return self.platform_name + ": " + self.platform_description
 
     @gl.public.write
-    def cancel(self) -> None:
-        if gl.message.sender_address != self.owner:
-            raise gl.vm.UserError("unauthorized")
-        if not self.is_open:
-            raise gl.vm.UserError("already cancelled")
-        self.is_open = False
-
-    def _safe_text(self, text: str) -> str:
-        return text.replace("\\n", " ").replace("[", "").replace("]", "")
+    def update_platform_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update description"
+        assert len(new_description) > 0, "Description cannot be empty"
+        self.platform_description = new_description
 
     @gl.public.write
-    def resolve(self) -> None:
-        # TODO: fetch self.news_source with gl.nondet.web.get
-        # Include first 1500 chars as context in the prompt
-        safe_q = self._safe_text(self.question)
-        prompt = (
-            f"[MARKET QUESTION: {safe_q}] "
-            "Has this condition been met? "
-            'Respond with JSON: {"verdict": "YES or NO", "confidence": 0-100}'
-        )
-        result = gl.nondet.exec_prompt(prompt, response_format="json")
-        self.resolution = result["verdict"]
-        self.confidence = int(result["confidence"])
+    def create_market(self, question: str, outcome_a: str, outcome_b: str, min_stake: u256) -> str:
+        assert min_stake > u256(0), "Minimum stake must be greater than zero"
+        market_id = "0"
+        self.market_creators[market_id] = gl.message.sender_address
+        self.market_questions[market_id] = question
+        self.market_outcome_a[market_id] = outcome_a
+        self.market_outcome_b[market_id] = outcome_b
+        self.market_statuses[market_id] = "active"
+        self.market_min_stakes[market_id] = min_stake
+        return market_id
 `,
-  task: "Update `resolve()` to fetch `self.news_source` using `gl.nondet.web.get` and include the first 1500 characters of the response as context in the LLM prompt.",
+  task: "Add four assert statements at the start of `create_market`, before any state writes: validate question is non-empty, outcome_a is non-empty, outcome_b is non-empty, and outcome_a is not equal to outcome_b.",
   hints: [
-    "`gl.nondet.web.get(url)` returns the page body as a plain string — store it in a local variable.",
-    "Truncate with `data[:1500]` to keep the prompt short and avoid hitting token limits.",
-    "`data = gl.nondet.web.get(self.news_source); prompt = f\"Context: {data[:1500]}\\\\n\\\\n[MARKET QUESTION: {safe_q}] Has this condition been met? ...`",
+    "Use `assert len(question) > 0, \"Question cannot be empty\"` for string length checks.",
+    "The inequality check is: `assert outcome_a != outcome_b, \"Outcomes must be different\"`",
+    "All four asserts must come BEFORE `market_id = \"0\"` and any `self.market_...` assignments.",
   ],
 };
 

@@ -3,153 +3,143 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 15,
   projectPath: "PREDICTION_MARKET",
-  explanation: `## Lesson 15 — CAPSTONE: PredictX Data Structures
+  explanation: `## Lesson 15 — Group 3 Capstone: Dashboard-Ready Contract
 
-You have now built all the core data structures for PredictX:
+This capstone combines everything built in Group 3 — indexing with \`DynArray\`, JSON views, status filtering, and lifecycle transitions — into a complete browseable dashboard contract.
 
-- **TreeMap** (L11) — maps each bettor \`Address\` to their \`BetRecord\`
-- **BetRecord dataclass** (L12) — structured record with \`outcome\`, \`amount\`, and \`bettor\`
-- **Ownership** (L13) — \`transfer_ownership\` with zero-address guard
-- **State machine** (L14) — \`OPEN → RESOLVED | CANCELLED\` enforced in every write
+PredictX can now power a frontend:
+- **List markets**: \`get_active_markets_json()\` returns all open markets
+- **View details**: \`get_market_json(market_id)\` returns a single market
+- **Create markets**: \`create_market(...)\` stores and indexes new markets
+- **Close markets**: \`close_market(market_id)\` transitions \`"active"\` → \`"closed"\`
 
-This capstone lesson ties them together by completing the two read-only accessors that the frontend and other contracts rely on most: \`get_status()\` and \`get_resolution()\`.
+The one new addition for this capstone is \`get_all_markets_json()\` — identical to \`get_active_markets_json()\` but without the status filter. It returns every market regardless of status, which a dashboard needs to show full history.
 
-Both are \`@gl.public.view\` methods — they don't modify state and cost no gas to call from off-chain tooling:
+Compare the two patterns:
 
 \`\`\`python
-@gl.public.view
-def get_status(self) -> str:
-    return self.status
+# filtered
+if self.market_statuses[market_id] == "active":
+    result.append({...})
 
-@gl.public.view
-def get_resolution(self) -> str:
-    return self.resolution
+# unfiltered — no if check, always append
+result.append({...})
 \`\`\`
 
-Simple as they look, these accessors are the contract's public API surface. Callers don't read storage directly — they call these methods. That means you can change internal representation later (e.g., switch from strings to integers) without breaking callers as long as the return type stays consistent.
-
-After this lesson the PredictX data-structure layer is complete. Lessons 16–20 add advanced AI consensus; lessons 21–25 add the payment layer.`,
+After this lesson the contract is dashboard-ready.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address, u256, TreeMap
-from dataclasses import dataclass
 
-OPEN      = "OPEN"
-RESOLVED  = "RESOLVED"
-CANCELLED = "CANCELLED"
+import json
+from genlayer import *
 
 
-@dataclass
-class BetRecord:
-    outcome: str
-    amount: u256
-    bettor: Address
-
-
-class PredictionMarket(gl.Contract):
-    question: str
-    bet_count: int
-    last_bettor: Address
+class PredictX(gl.Contract):
     owner: Address
-    market_id: u256
-    status: str
-    resolution: str
-    confidence: int
-    news_source: str
-    bets: TreeMap[Address, BetRecord]
+    platform_name: str
+    platform_description: str
 
-    def __init__(self, question: str, market_id: u256) -> None:
-        self.question = question
-        self.bet_count = 0
+    market_questions: TreeMap[str, str]
+    market_outcome_a: TreeMap[str, str]
+    market_outcome_b: TreeMap[str, str]
+    market_creators: TreeMap[str, Address]
+    market_min_stakes: TreeMap[str, u256]
+    market_statuses: TreeMap[str, str]
+    market_count: u256
+    market_ids: DynArray[str]
+
+    def __init__(self) -> None:
         self.owner = gl.message.sender_address
-        self.market_id = market_id
-        self.status = OPEN
-        self.resolution = ""
-        self.confidence = 0
-        self.news_source = "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd"
-        self.bets = TreeMap[Address, BetRecord]()
+        self.platform_name = "PredictX"
+        self.platform_description = "A GenLayer prediction market that uses AI-assisted resolution."
+        self.market_count = u256(0)
 
     @gl.public.view
-    def get_question(self) -> str:
-        return self.question
+    def get_platform_name(self) -> str:
+        return self.platform_name
+
+    @gl.public.view
+    def get_platform_description(self) -> str:
+        return self.platform_description
 
     @gl.public.view
     def get_owner(self) -> str:
-        return str(self.owner)
+        return self.owner.as_hex
 
     @gl.public.view
-    def get_status(self) -> str:
-        pass  # TODO: return self.status
+    def get_contract_summary(self) -> str:
+        return self.platform_name + ": " + self.platform_description
+
+    @gl.public.write
+    def update_platform_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update description"
+        assert len(new_description) > 0, "Description cannot be empty"
+        self.platform_description = new_description
+
+    @gl.public.write
+    def create_market(self, question: str, outcome_a: str, outcome_b: str, min_stake: u256) -> str:
+        assert len(question) > 0, "Question cannot be empty"
+        assert len(outcome_a) > 0, "Outcome A cannot be empty"
+        assert len(outcome_b) > 0, "Outcome B cannot be empty"
+        assert outcome_a != outcome_b, "Outcomes must be different"
+        assert min_stake > u256(0), "Minimum stake must be greater than zero"
+
+        market_id = str(self.market_count)
+
+        self.market_creators[market_id] = gl.message.sender_address
+        self.market_questions[market_id] = question
+        self.market_outcome_a[market_id] = outcome_a
+        self.market_outcome_b[market_id] = outcome_b
+        self.market_min_stakes[market_id] = min_stake
+        self.market_statuses[market_id] = "active"
+
+        self.market_count += u256(1)
+        self.market_ids.append(market_id)
+
+        return market_id
 
     @gl.public.view
-    def get_resolution(self) -> str:
-        pass  # TODO: return self.resolution
-
-    @gl.public.write
-    def transfer_ownership(self, new_owner: Address) -> None:
-        if gl.message.sender_address != self.owner:
-            raise gl.vm.UserError("unauthorized")
-        if new_owner == Address("0x0000000000000000000000000000000000000000"):
-            raise gl.vm.UserError("cannot transfer to zero address")
-        self.owner = new_owner
-
-    @gl.public.write
-    def place_bet(self, outcome: str) -> None:
-        if self.status != OPEN:
-            raise gl.vm.UserError("market not open")
-        if outcome not in ["YES", "NO"]:
-            raise gl.vm.UserError("outcome must be YES or NO")
-        self.bet_count += 1
-        self.last_bettor = gl.message.sender_address
-        self.bets[gl.message.sender_address] = BetRecord(
-            outcome=outcome, amount=0, bettor=gl.message.sender_address
-        )
+    def get_market_json(self, market_id: str) -> str:
+        assert market_id in self.market_questions, "Market not found"
+        return json.dumps({
+            "id": market_id,
+            "creator": self.market_creators[market_id].as_hex,
+            "question": self.market_questions[market_id],
+            "outcome_a": self.market_outcome_a[market_id],
+            "outcome_b": self.market_outcome_b[market_id],
+            "min_stake": str(self.market_min_stakes[market_id]),
+            "status": self.market_statuses[market_id],
+        }, sort_keys=True)
 
     @gl.public.view
-    def get_bet_count(self) -> int:
-        return self.bet_count
-
-    @gl.public.view
-    def get_bet(self, bettor: Address) -> str:
-        record = self.bets.get(bettor, None)
-        if record is None:
-            return "NO_BET"
-        return record.outcome
-
-    @gl.public.write
-    def cancel(self) -> None:
-        if gl.message.sender_address != self.owner:
-            raise gl.vm.UserError("unauthorized")
-        if self.status != OPEN:
-            raise gl.vm.UserError("market not open")
-        self.status = CANCELLED
-
-    def _safe_text(self, text: str) -> str:
-        return text.replace("\\n", " ").replace("[", "").replace("]", "")
+    def get_active_markets_json(self) -> str:
+        result = []
+        for market_id in self.market_ids:
+            if self.market_statuses[market_id] == "active":
+                result.append({
+                    "id": market_id,
+                    "creator": self.market_creators[market_id].as_hex,
+                    "question": self.market_questions[market_id],
+                    "outcome_a": self.market_outcome_a[market_id],
+                    "outcome_b": self.market_outcome_b[market_id],
+                    "min_stake": str(self.market_min_stakes[market_id]),
+                    "status": self.market_statuses[market_id],
+                })
+        return json.dumps(result, sort_keys=True)
 
     @gl.public.write
-    def resolve(self) -> None:
-        if self.status != OPEN:
-            raise gl.vm.UserError("market not open")
-        data = gl.nondet.web.get(self.news_source)
-        safe_q = self._safe_text(self.question)
-        prompt = (
-            f"Context: {data[:1500]}\\n\\n"
-            f"[MARKET QUESTION: {safe_q}]\\n"
-            'Respond with JSON: {"verdict": "YES or NO", "confidence": 0-100}'
-        )
-        result = gl.nondet.exec_prompt(prompt, response_format="json")
-        if int(result["confidence"]) < 70:
-            raise gl.vm.UserError("confidence too low — try again")
-        self.resolution = result["verdict"]
-        self.confidence = int(result["confidence"])
-        self.status = RESOLVED
+    def close_market(self, market_id: str) -> None:
+        assert market_id in self.market_questions, "Market not found"
+        caller = gl.message.sender_address
+        creator = self.market_creators[market_id]
+        assert caller == creator or caller == self.owner, "Only creator or owner can close market"
+        assert self.market_statuses[market_id] == "active", "Market is not active"
+        self.market_statuses[market_id] = "closed"
 `,
-  task: "Implement `get_status()` to return `self.status` and `get_resolution()` to return `self.resolution`.",
+  task: "Add `get_all_markets_json(self) -> str` that loops over `self.market_ids`, appends every market as a dict to a result list (no status filter), and returns `json.dumps(result, sort_keys=True)`.",
   hints: [
-    "Both are `@gl.public.view` methods — they only read stored state, no computation needed.",
-    "`get_resolution()` should return `self.resolution` — an empty string `\"\"` when the market is still OPEN.",
-    "Replace each `pass` with a single `return` statement: `return self.status` and `return self.resolution`.",
+    "It's identical to `get_active_markets_json()` but remove the `if` filter line.",
+    "Loop: `for market_id in self.market_ids:` and `result.append({...})` for every market.",
+    "Include the same fields as `get_active_markets_json`: id, creator, question, outcome_a, outcome_b, min_stake, status.",
   ],
 };
 

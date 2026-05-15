@@ -3,152 +3,129 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 14,
   projectPath: "PREDICTION_MARKET",
-  explanation: `## Lesson 14 — State Machines
+  explanation: `## Lesson 14 — Status State Machines: Lifecycle Transitions
 
-PredictX markets move through a lifecycle: they start **OPEN**, then become either **RESOLVED** (AI picked a winner) or **CANCELLED** (owner called it off). A string constant is fine for storage, but you need to *enforce* the transitions — otherwise someone could call \`resolve()\` on an already-resolved market and overwrite the result.
+Markets follow a lifecycle: \`"active"\` → \`"closed"\` → \`"resolved"\`. Each transition has rules — you can't skip steps or go backwards.
 
-Define the valid states as module-level constants so every check reads clearly:
-
-\`\`\`python
-OPEN       = "OPEN"
-RESOLVED   = "RESOLVED"
-CANCELLED  = "CANCELLED"
-\`\`\`
-
-Then guard every write method with a status check:
+\`close_market\` moves a market from \`"active"\` to \`"closed"\`. Two roles can trigger this: the market creator or the contract owner. Multiple-condition auth checks use \`or\`:
 
 \`\`\`python
-@gl.public.write
-def place_bet(self, outcome: str) -> None:
-    if self.status != OPEN:
-        raise gl.vm.UserError("market not open")
-    ...
-
-@gl.public.write
-def resolve(self) -> None:
-    if self.status != OPEN:
-        raise gl.vm.UserError("market not open")
-    ...
-    self.status = RESOLVED
-
-@gl.public.write
-def cancel(self) -> None:
-    if gl.message.sender_address != self.owner:
-        raise gl.vm.UserError("unauthorized")
-    if self.status != OPEN:
-        raise gl.vm.UserError("market not open")
-    self.status = CANCELLED
+caller = gl.message.sender_address
+creator = self.market_creators[market_id]
+assert caller == creator or caller == self.owner, "Only creator or owner can close market"
 \`\`\`
 
-State machine enforcement is the contract equivalent of a database constraint — it makes invalid states unrepresentable at runtime. The three constants also act as documentation: any reader can see the full lifecycle at a glance.`,
+The full set of assertions for a transition:
+1. Market must exist
+2. Caller must be authorized
+3. Market must be in the required starting state
+4. Then update the state
+
+Enforcing these rules prevents invalid transitions and protects the integrity of the market lifecycle.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address, u256, TreeMap
-from dataclasses import dataclass
 
-OPEN      = "OPEN"
-RESOLVED  = "RESOLVED"
-CANCELLED = "CANCELLED"
+import json
+from genlayer import *
 
 
-@dataclass
-class BetRecord:
-    outcome: str
-    amount: u256
-    bettor: Address
-
-
-class PredictionMarket(gl.Contract):
-    question: str
-    bet_count: int
-    last_bettor: Address
+class PredictX(gl.Contract):
     owner: Address
-    market_id: u256
-    status: str
-    resolution: str
-    confidence: int
-    news_source: str
-    bets: TreeMap[Address, BetRecord]
+    platform_name: str
+    platform_description: str
 
-    def __init__(self, question: str, market_id: u256) -> None:
-        self.question = question
-        self.bet_count = 0
+    market_questions: TreeMap[str, str]
+    market_outcome_a: TreeMap[str, str]
+    market_outcome_b: TreeMap[str, str]
+    market_creators: TreeMap[str, Address]
+    market_min_stakes: TreeMap[str, u256]
+    market_statuses: TreeMap[str, str]
+    market_count: u256
+    market_ids: DynArray[str]
+
+    def __init__(self) -> None:
         self.owner = gl.message.sender_address
-        self.market_id = market_id
-        self.status = OPEN
-        self.resolution = ""
-        self.confidence = 0
-        self.news_source = "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd"
-        self.bets = TreeMap[Address, BetRecord]()
+        self.platform_name = "PredictX"
+        self.platform_description = "A GenLayer prediction market that uses AI-assisted resolution."
+        self.market_count = u256(0)
 
     @gl.public.view
-    def get_question(self) -> str:
-        return self.question
+    def get_platform_name(self) -> str:
+        return self.platform_name
+
+    @gl.public.view
+    def get_platform_description(self) -> str:
+        return self.platform_description
 
     @gl.public.view
     def get_owner(self) -> str:
-        return str(self.owner)
-
-    @gl.public.write
-    def transfer_ownership(self, new_owner: Address) -> None:
-        if gl.message.sender_address != self.owner:
-            raise gl.vm.UserError("unauthorized")
-        if new_owner == Address("0x0000000000000000000000000000000000000000"):
-            raise gl.vm.UserError("cannot transfer to zero address")
-        self.owner = new_owner
-
-    @gl.public.write
-    def place_bet(self, outcome: str) -> None:
-        # TODO: add status check — only allow when OPEN
-        if outcome not in ["YES", "NO"]:
-            raise gl.vm.UserError("outcome must be YES or NO")
-        self.bet_count += 1
-        self.last_bettor = gl.message.sender_address
-        self.bets[gl.message.sender_address] = BetRecord(
-            outcome=outcome, amount=0, bettor=gl.message.sender_address
-        )
+        return self.owner.as_hex
 
     @gl.public.view
-    def get_bet_count(self) -> int:
-        return self.bet_count
+    def get_contract_summary(self) -> str:
+        return self.platform_name + ": " + self.platform_description
+
+    @gl.public.write
+    def update_platform_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update description"
+        assert len(new_description) > 0, "Description cannot be empty"
+        self.platform_description = new_description
+
+    @gl.public.write
+    def create_market(self, question: str, outcome_a: str, outcome_b: str, min_stake: u256) -> str:
+        assert len(question) > 0, "Question cannot be empty"
+        assert len(outcome_a) > 0, "Outcome A cannot be empty"
+        assert len(outcome_b) > 0, "Outcome B cannot be empty"
+        assert outcome_a != outcome_b, "Outcomes must be different"
+        assert min_stake > u256(0), "Minimum stake must be greater than zero"
+
+        market_id = str(self.market_count)
+
+        self.market_creators[market_id] = gl.message.sender_address
+        self.market_questions[market_id] = question
+        self.market_outcome_a[market_id] = outcome_a
+        self.market_outcome_b[market_id] = outcome_b
+        self.market_min_stakes[market_id] = min_stake
+        self.market_statuses[market_id] = "active"
+
+        self.market_count += u256(1)
+        self.market_ids.append(market_id)
+
+        return market_id
 
     @gl.public.view
-    def get_bet(self, bettor: Address) -> str:
-        record = self.bets.get(bettor, None)
-        if record is None:
-            return "NO_BET"
-        return record.outcome
+    def get_market_json(self, market_id: str) -> str:
+        assert market_id in self.market_questions, "Market not found"
+        return json.dumps({
+            "id": market_id,
+            "creator": self.market_creators[market_id].as_hex,
+            "question": self.market_questions[market_id],
+            "outcome_a": self.market_outcome_a[market_id],
+            "outcome_b": self.market_outcome_b[market_id],
+            "min_stake": str(self.market_min_stakes[market_id]),
+            "status": self.market_statuses[market_id],
+        }, sort_keys=True)
 
-    @gl.public.write
-    def cancel(self) -> None:
-        # TODO: add status check and set self.status = CANCELLED
-        if gl.message.sender_address != self.owner:
-            raise gl.vm.UserError("unauthorized")
-
-    def _safe_text(self, text: str) -> str:
-        return text.replace("\\n", " ").replace("[", "").replace("]", "")
-
-    @gl.public.write
-    def resolve(self) -> None:
-        # TODO: add status check; set self.status = RESOLVED after resolution
-        data = gl.nondet.web.get(self.news_source)
-        safe_q = self._safe_text(self.question)
-        prompt = (
-            f"Context: {data[:1500]}\\n\\n"
-            f"[MARKET QUESTION: {safe_q}]\\n"
-            'Respond with JSON: {"verdict": "YES or NO", "confidence": 0-100}'
-        )
-        result = gl.nondet.exec_prompt(prompt, response_format="json")
-        if int(result["confidence"]) < 70:
-            raise gl.vm.UserError("confidence too low — try again")
-        self.resolution = result["verdict"]
-        self.confidence = int(result["confidence"])
+    @gl.public.view
+    def get_active_markets_json(self) -> str:
+        result = []
+        for market_id in self.market_ids:
+            if self.market_statuses[market_id] == "active":
+                result.append({
+                    "id": market_id,
+                    "creator": self.market_creators[market_id].as_hex,
+                    "question": self.market_questions[market_id],
+                    "outcome_a": self.market_outcome_a[market_id],
+                    "outcome_b": self.market_outcome_b[market_id],
+                    "min_stake": str(self.market_min_stakes[market_id]),
+                    "status": self.market_statuses[market_id],
+                })
+        return json.dumps(result, sort_keys=True)
 `,
-  task: "Add status-transition guards: `place_bet()` must raise if status is not OPEN; `resolve()` must raise if not OPEN, then set `self.status = RESOLVED`; `cancel()` must raise if not OPEN (in addition to the owner check), then set `self.status = CANCELLED`.",
+  task: "Add `close_market(self, market_id: str) -> None` with `@gl.public.write`. It must assert the market exists, assert the caller is the creator or owner, assert the status is `\"active\"`, then set status to `\"closed\"`.",
   hints: [
-    "Use the module-level constants: `if self.status != OPEN: raise gl.vm.UserError(\"market not open\")`",
-    "In `resolve()`, add the guard at the very top, then after storing `self.resolution` add `self.status = RESOLVED`.",
-    "In `cancel()`, check owner first, then `if self.status != OPEN: raise gl.vm.UserError(\"market not open\")`, then `self.status = CANCELLED`.",
+    "Use `caller = gl.message.sender_address` and `creator = self.market_creators[market_id]`.",
+    "The auth check: `assert caller == creator or caller == self.owner, \"Only creator or owner can close market\"`",
+    "Set `self.market_statuses[market_id] = \"closed\"` only after all assertions pass.",
   ],
 };
 

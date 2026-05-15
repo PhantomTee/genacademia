@@ -3,129 +3,103 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 12,
   projectPath: "PREDICTION_MARKET",
-  explanation: `## Lesson 12 — Dataclasses as On-Chain Records
+  explanation: `## Lesson 12 — json.dumps Views: Frontend-Friendly JSON Output
 
-Storing just the outcome string works, but PredictX also needs to know how much each bettor wagered and who they are. Python \`@dataclass\` types can be stored in a \`TreeMap\`, giving us a structured record per bettor.
+GenLayer view methods return Python values. To serve structured data to frontends, use \`json.dumps({...})\` which converts a Python dict to a JSON string. Add \`import json\` at the top of the file.
 
-\`\`\`python
-from dataclasses import dataclass
-from genlayer.types import Address, u256
-
-@dataclass
-class BetRecord:
-    outcome: str
-    amount: u256
-    bettor: Address
-\`\`\`
-
-The \`@dataclass\` decorator auto-generates \`__init__\`, \`__repr__\`, and \`__eq__\` — and GenLayer knows how to serialise these to on-chain storage. Update the \`TreeMap\` type parameter to \`TreeMap[Address, BetRecord]\`:
+Use \`sort_keys=True\` for consistent, predictable key ordering:
 
 \`\`\`python
-self.bets: TreeMap[Address, BetRecord]
+import json
 
-@gl.public.write
-def place_bet(self, outcome: str) -> None:
-    record = BetRecord(
-        outcome=outcome,
-        amount=0,        # will be set from gl.message.value in Lesson 21
-        bettor=gl.message.sender_address,
-    )
-    self.bets[gl.message.sender_address] = record
+return json.dumps({"key": "value"}, sort_keys=True)
 \`\`\`
 
-Using structured records now means the payout logic in Lessons 22–25 can read \`record.amount\` and \`record.bettor\` directly without a separate lookup. Good data modelling now saves complexity later.`,
+**Type conversions required:**
+- Addresses must be converted to strings: \`self.market_creators[market_id].as_hex\`
+- \`u256\` numbers must be converted to strings: \`str(self.market_min_stakes[market_id])\`
+
+Always guard against missing markets before reading their data:
+
+\`\`\`python
+assert market_id in self.market_questions, "Market not found"
+\`\`\`
+
+This pattern — validate, build a dict, return \`json.dumps\` — is the standard for any structured view across all GenLayer contracts.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address, u256, TreeMap
-from dataclasses import dataclass
+
+from genlayer import *
 
 
-@dataclass
-class BetRecord:
-    pass  # TODO: add fields: outcome: str, amount: u256, bettor: Address
-
-
-class PredictionMarket(gl.Contract):
-    question: str
-    bet_count: int
-    last_bettor: Address
+class PredictX(gl.Contract):
     owner: Address
-    market_id: u256
-    is_open: bool
-    resolution: str
-    confidence: int
-    news_source: str
-    bets: TreeMap[Address, BetRecord]
+    platform_name: str
+    platform_description: str
 
-    def __init__(self, question: str, market_id: u256) -> None:
-        self.question = question
-        self.bet_count = 0
+    market_questions: TreeMap[str, str]
+    market_outcome_a: TreeMap[str, str]
+    market_outcome_b: TreeMap[str, str]
+    market_creators: TreeMap[str, Address]
+    market_min_stakes: TreeMap[str, u256]
+    market_statuses: TreeMap[str, str]
+    market_count: u256
+    market_ids: DynArray[str]
+
+    def __init__(self) -> None:
         self.owner = gl.message.sender_address
-        self.market_id = market_id
-        self.is_open = True
-        self.resolution = ""
-        self.confidence = 0
-        self.news_source = "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd"
-        self.bets = TreeMap[Address, BetRecord]()
+        self.platform_name = "PredictX"
+        self.platform_description = "A GenLayer prediction market that uses AI-assisted resolution."
+        self.market_count = u256(0)
 
     @gl.public.view
-    def get_question(self) -> str:
-        return self.question
+    def get_platform_name(self) -> str:
+        return self.platform_name
+
+    @gl.public.view
+    def get_platform_description(self) -> str:
+        return self.platform_description
 
     @gl.public.view
     def get_owner(self) -> str:
-        return str(self.owner)
-
-    @gl.public.write
-    def place_bet(self, outcome: str) -> None:
-        if outcome not in ["YES", "NO"]:
-            raise gl.vm.UserError("outcome must be YES or NO")
-        self.bet_count += 1
-        self.last_bettor = gl.message.sender_address
-        # TODO: create a BetRecord and store it in self.bets
+        return self.owner.as_hex
 
     @gl.public.view
-    def get_bet_count(self) -> int:
-        return self.bet_count
-
-    @gl.public.view
-    def get_bet(self, bettor: Address) -> str:
-        record = self.bets.get(bettor, None)
-        if record is None:
-            return "NO_BET"
-        return record.outcome
+    def get_contract_summary(self) -> str:
+        return self.platform_name + ": " + self.platform_description
 
     @gl.public.write
-    def cancel(self) -> None:
-        if gl.message.sender_address != self.owner:
-            raise gl.vm.UserError("unauthorized")
-        if not self.is_open:
-            raise gl.vm.UserError("already cancelled")
-        self.is_open = False
-
-    def _safe_text(self, text: str) -> str:
-        return text.replace("\\n", " ").replace("[", "").replace("]", "")
+    def update_platform_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update description"
+        assert len(new_description) > 0, "Description cannot be empty"
+        self.platform_description = new_description
 
     @gl.public.write
-    def resolve(self) -> None:
-        data = gl.nondet.web.get(self.news_source)
-        safe_q = self._safe_text(self.question)
-        prompt = (
-            f"Context: {data[:1500]}\\n\\n"
-            f"[MARKET QUESTION: {safe_q}]\\n"
-            'Respond with JSON: {"verdict": "YES or NO", "confidence": 0-100}'
-        )
-        result = gl.nondet.exec_prompt(prompt, response_format="json")
-        if int(result["confidence"]) < 70:
-            raise gl.vm.UserError("confidence too low — try again")
-        self.resolution = result["verdict"]
-        self.confidence = int(result["confidence"])
+    def create_market(self, question: str, outcome_a: str, outcome_b: str, min_stake: u256) -> str:
+        assert len(question) > 0, "Question cannot be empty"
+        assert len(outcome_a) > 0, "Outcome A cannot be empty"
+        assert len(outcome_b) > 0, "Outcome B cannot be empty"
+        assert outcome_a != outcome_b, "Outcomes must be different"
+        assert min_stake > u256(0), "Minimum stake must be greater than zero"
+
+        market_id = str(self.market_count)
+
+        self.market_creators[market_id] = gl.message.sender_address
+        self.market_questions[market_id] = question
+        self.market_outcome_a[market_id] = outcome_a
+        self.market_outcome_b[market_id] = outcome_b
+        self.market_min_stakes[market_id] = min_stake
+        self.market_statuses[market_id] = "active"
+
+        self.market_count += u256(1)
+        self.market_ids.append(market_id)
+
+        return market_id
 `,
-  task: "Complete the `BetRecord` dataclass with fields `outcome: str`, `amount: u256`, and `bettor: Address`, then update `place_bet()` to create and store a `BetRecord` in `self.bets`.",
+  task: "Add `import json` at the top, then add a view method `get_market_json(self, market_id: str) -> str` that asserts the market exists and returns a JSON string with fields: id, creator (as hex), question, outcome_a, outcome_b, min_stake (as string), and status.",
   hints: [
-    "Add the `@dataclass` decorator and three type-annotated fields: `outcome: str`, `amount: u256`, `bettor: Address`.",
-    "Create the record inside `place_bet`: `record = BetRecord(outcome=outcome, amount=0, bettor=gl.message.sender_address)`",
-    "`self.bets[gl.message.sender_address] = BetRecord(outcome=outcome, amount=0, bettor=gl.message.sender_address)`",
+    "Add `import json` before `from genlayer import *` at the top of the file.",
+    "Guard against missing markets: `assert market_id in self.market_questions, \"Market not found\"`",
+    "Return `json.dumps({\"id\": market_id, \"creator\": self.market_creators[market_id].as_hex, ...}, sort_keys=True)` with all required fields.",
   ],
 };
 

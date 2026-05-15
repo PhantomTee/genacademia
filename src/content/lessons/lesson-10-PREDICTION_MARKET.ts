@@ -3,100 +3,94 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 10,
   projectPath: "PREDICTION_MARKET",
-  explanation: `## Lesson 10 — CAPSTONE: AI Oracle
+  explanation: `## Lesson 10 — CAPSTONE: Persistent Counter for Unique Market IDs
 
-This capstone combines everything from Lessons 6–9 into a production-grade resolution oracle. The complete \`resolve()\` method:
+Hard-coding the market ID as \`"0"\` means every \`create_market\` call overwrites the same record. To support multiple independent markets, you need a persistent counter that increments each time a market is created.
 
-1. Fetches live price data from \`self.news_source\` via \`web.get\`
-2. Sanitises the market question with \`_safe_text\`
-3. Calls \`exec_prompt\` with \`response_format="json"\` for structured output
-4. **Rejects low-confidence resolutions** — if the AI is less than 70% sure, it raises a \`UserError\` so the owner can try again later
+### The counter pattern
+
+\`market_count: u256\` starts at zero and is initialised in \`__init__\`. Every time a market is created, the current counter value becomes the market ID, data is stored, then the counter is incremented:
 
 \`\`\`python
-@gl.public.write
-def resolve(self) -> None:
-    data = gl.nondet.web.get(self.news_source)
-    safe_q = self._safe_text(self.question)
-    prompt = (
-        f"Context: {data[:1500]}\\n\\n"
-        f"[MARKET QUESTION: {safe_q}]\\n"
-        'Respond with JSON: {"verdict": "YES or NO", "confidence": 0-100}'
-    )
-    result = gl.nondet.exec_prompt(prompt, response_format="json")
-    if int(result["confidence"]) < 70:
-        raise gl.vm.UserError("confidence too low — try again")
-    self.resolution = result["verdict"]
-    self.confidence = int(result["confidence"])
+market_id = str(self.market_count)
+# ... store all market data using market_id ...
+self.market_count += u256(1)
+return market_id
 \`\`\`
 
-The confidence gate is crucial for a fair market: it prevents the contract from settling on ambiguous data and gives the owner the option to retry when evidence is inconclusive.`,
+The increment happens **after** writing all market data. This ensures the ID embedded in the stored data matches what gets returned to the caller. The first market gets ID \`"0"\`, the second gets \`"1"\`, and so on.
+
+### Converting u256 to string
+
+\`str(self.market_count)\` converts the \`u256\` counter to a plain Python string so it can be used as a \`TreeMap\` key. This is the standard pattern for numeric IDs in GenLayer contracts.
+
+### What you have built
+
+After this capstone, PredictX can store an unlimited number of independent prediction markets — each with its own question, outcomes, creator, minimum stake, and status — all inside a single deployed contract. The identity layer (Lessons 1–5) and the market storage layer (Lessons 6–10) are now complete.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address, u256
+
+from genlayer import *
 
 
-class PredictionMarket(gl.Contract):
-    question: str
-    bet_count: int
-    last_bettor: Address
+class PredictX(gl.Contract):
     owner: Address
-    market_id: u256
-    is_open: bool
-    resolution: str
-    confidence: int
-    news_source: str
+    platform_name: str
+    platform_description: str
+    market_questions: TreeMap[str, str]
+    market_outcome_a: TreeMap[str, str]
+    market_outcome_b: TreeMap[str, str]
+    market_creators: TreeMap[str, Address]
+    market_statuses: TreeMap[str, str]
+    market_min_stakes: TreeMap[str, u256]
 
-    def __init__(self, question: str, market_id: u256) -> None:
-        self.question = question
-        self.bet_count = 0
+    def __init__(self) -> None:
         self.owner = gl.message.sender_address
-        self.market_id = market_id
-        self.is_open = True
-        self.resolution = ""
-        self.confidence = 0
-        self.news_source = "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd"
+        self.platform_name = "PredictX"
+        self.platform_description = "A GenLayer prediction market that uses AI-assisted resolution."
 
     @gl.public.view
-    def get_question(self) -> str:
-        return self.question
+    def get_platform_name(self) -> str:
+        return self.platform_name
+
+    @gl.public.view
+    def get_platform_description(self) -> str:
+        return self.platform_description
 
     @gl.public.view
     def get_owner(self) -> str:
-        return str(self.owner)
-
-    @gl.public.write
-    def place_bet(self, outcome: str) -> None:
-        if outcome not in ["YES", "NO"]:
-            raise gl.vm.UserError("outcome must be YES or NO")
-        self.bet_count += 1
-        self.last_bettor = gl.message.sender_address
+        return self.owner.as_hex
 
     @gl.public.view
-    def get_bet_count(self) -> int:
-        return self.bet_count
+    def get_contract_summary(self) -> str:
+        return self.platform_name + ": " + self.platform_description
 
     @gl.public.write
-    def cancel(self) -> None:
-        if gl.message.sender_address != self.owner:
-            raise gl.vm.UserError("unauthorized")
-        if not self.is_open:
-            raise gl.vm.UserError("already cancelled")
-        self.is_open = False
-
-    def _safe_text(self, text: str) -> str:
-        return text.replace("\\n", " ").replace("[", "").replace("]", "")
+    def update_platform_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update description"
+        assert len(new_description) > 0, "Description cannot be empty"
+        self.platform_description = new_description
 
     @gl.public.write
-    def resolve(self) -> None:
-        # TODO: fetch news_source, call exec_prompt with JSON format,
-        # raise UserError if confidence < 70, otherwise store verdict and confidence
-        pass
+    def create_market(self, question: str, outcome_a: str, outcome_b: str, min_stake: u256) -> str:
+        assert len(question) > 0, "Question cannot be empty"
+        assert len(outcome_a) > 0, "Outcome A cannot be empty"
+        assert len(outcome_b) > 0, "Outcome B cannot be empty"
+        assert outcome_a != outcome_b, "Outcomes must be different"
+        assert min_stake > u256(0), "Minimum stake must be greater than zero"
+        market_id = "0"
+        self.market_creators[market_id] = gl.message.sender_address
+        self.market_questions[market_id] = question
+        self.market_outcome_a[market_id] = outcome_a
+        self.market_outcome_b[market_id] = outcome_b
+        self.market_statuses[market_id] = "active"
+        self.market_min_stakes[market_id] = min_stake
+        return market_id
 `,
-  task: "Implement the complete `resolve()`: fetch `self.news_source`, call `exec_prompt` with JSON format asking for verdict and confidence, raise `UserError` if confidence is below 70, otherwise store both values.",
+  task: "Add `market_count: u256` as a persistent field, initialize it to `u256(0)` in the constructor, replace the hardcoded `\"0\"` ID with `str(self.market_count)`, and increment the counter with `self.market_count += u256(1)` before returning.",
   hints: [
-    "Chain the calls: `data = gl.nondet.web.get(self.news_source)` then build a prompt including `data[:1500]` and the sanitised question.",
-    "Parse the JSON dict: `result = gl.nondet.exec_prompt(prompt, response_format=\"json\")` then check `int(result[\"confidence\"]) < 70`.",
-    "`if int(result[\"confidence\"]) < 70: raise gl.vm.UserError(\"confidence too low — try again\")` — only store after this gate.",
+    "Add `market_count: u256` in the class body and `self.market_count = u256(0)` in `__init__`.",
+    "Replace `market_id = \"0\"` with `market_id = str(self.market_count)`.",
+    "Add `self.market_count += u256(1)` AFTER storing all market data but BEFORE the `return market_id` line.",
   ],
 };
 

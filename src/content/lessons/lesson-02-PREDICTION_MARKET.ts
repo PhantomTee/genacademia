@@ -3,55 +3,58 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 2,
   projectPath: "PREDICTION_MARKET",
-  explanation: `## Lesson 2 — @gl.public.write & State Mutation
+  explanation: `## Lesson 2 — Contract Skeleton: Constructor, Owner, Typed State
 
-Now that users can read the market question, they need a way to participate. In PredictX, placing a bet is the first write operation: we record that someone called \`place_bet\` and track how many bets have been placed.
+The contract skeleton is the foundation everything else builds on. This lesson covers four key elements:
 
-Methods that **change** on-chain state must be decorated with \`@gl.public.write\`. Without that decorator, any attempt to modify state will be rejected by the runtime.
+1. **The dependency header** — tells GenLayer which SDK version to use.
+2. **\`from genlayer import *\`** — imports all GenLayer types and decorators.
+3. **Class-level state variables** — declared with type annotations; persisted on-chain automatically.
+4. **The constructor** — runs once at deploy time to initialise state.
+
+### Storing the deployer as owner
+
+\`gl.message.sender_address\` is the wallet address that called the constructor during deployment. Storing it as \`self.owner\` lets you write owner-only methods later:
 
 \`\`\`python
-@gl.public.write
-def place_bet(self, outcome: str) -> None:
-    self.bet_count += 1
-    self.last_bettor = gl.message.sender_address
+def __init__(self) -> None:
+    self.owner = gl.message.sender_address
 \`\`\`
 
-\`gl.message.sender_address\` gives you the \`Address\` of whoever called the method — the on-chain equivalent of \`msg.sender\` in Solidity. You can store it, compare it, and later use it to authorise payouts.
+\`Address\` is GenLayer's built-in blockchain address type. It supports equality comparison and has an \`.as_hex\` property for converting to a plain string.
 
-View methods still work the same way — \`get_bet_count\` is a pure read that returns the current counter without touching any state.
+### All state must be declared at class level
 
-By the end of this lesson PredictX can accept bets and report how many have been placed — a critical first step before adding amounts, outcomes, and payouts in later lessons.`,
+Variables created only inside methods are **not** persisted between calls. Only class-level type annotations become on-chain storage:
+
+\`\`\`python
+class PredictX(gl.Contract):
+    owner: Address          # persisted ✓
+    platform_name: str      # persisted ✓
+
+    def __init__(self) -> None:
+        local_var = "x"     # NOT persisted — disappears after the call
+        self.owner = gl.message.sender_address
+        self.platform_name = "PredictX"
+\`\`\``,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address
+
+from genlayer import *
 
 
-class PredictionMarket(gl.Contract):
-    question: str
-    bet_count: int
-    last_bettor: Address
+class PredictX(gl.Contract):
+    owner: Address
+    platform_name: str
 
-    def __init__(self, question: str) -> None:
-        self.question = question
-        self.bet_count = 0
-
-    @gl.public.view
-    def get_question(self) -> str:
-        return self.question
-
-    @gl.public.write
-    def place_bet(self, outcome: str) -> None:
-        pass
-
-    @gl.public.view
-    def get_bet_count(self) -> int:
-        pass
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.platform_name = "PredictX"
 `,
-  task: "Implement `place_bet()` to increment `bet_count` and store the caller's address in `last_bettor`, then implement `get_bet_count()` to return the current count.",
+  task: "Add a third persistent field `platform_description: str` declared at class level, and initialize it in `__init__` with the string \"A GenLayer prediction market that uses AI-assisted resolution.\"",
   hints: [
-    "Write methods need `@gl.public.write` — already applied here. Inside, modify `self` state freely.",
-    "`gl.message.sender_address` returns the `Address` of the current caller — assign it to `self.last_bettor`.",
-    "`self.bet_count += 1` increments the counter; `get_bet_count` just needs `return self.bet_count`.",
+    "Declare `platform_description: str` at class level, on a new line after `platform_name: str`.",
+    "In `__init__`, add `self.platform_description = ...` after the other assignments.",
+    "The exact string value is: `\"A GenLayer prediction market that uses AI-assisted resolution.\"`",
   ],
 };
 

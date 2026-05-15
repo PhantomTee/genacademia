@@ -3,192 +3,231 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 22,
   projectPath: "PREDICTION_MARKET",
-  explanation: `## Lesson 22 — Transferring GEN with gl.send
+  explanation: `## Lesson 22 — Calling AI with gl.nondet.exec_prompt
 
-The market now holds real GEN in its \`total_pot\`. After resolution, winners need to be paid. \`gl.send(address, amount)\` transfers GEN from the contract to any address:
+\`gl.nondet.exec_prompt(prompt)\` calls an LLM and returns its response as a string. This is non-deterministic — different validators may get slightly different responses — but GenLayer's Optimistic Simulator reaches consensus on whether the responses are equivalent.
 
+For binary decisions like \`"A"\` or \`"B"\`, the prompt must be very precise. End it with \`". Return only A or B."\` to force a clean single-character answer. After the call, always assert the result is valid before storing it.
+
+**Pattern:**
 \`\`\`python
-gl.send(winner_address, payout_amount)
-\`\`\`
-
-PredictX uses **proportional payouts**: a winner's share equals their individual stake divided by the total staked on the winning side, multiplied by the whole pot:
-
-\`\`\`python
-share = bet_amount * self.total_pot // winning_side_total
-\`\`\`
-
-You also need a \`claimed\` map to prevent double-claiming:
-
-\`\`\`python
-claimed: TreeMap[Address, bool]
-
 @gl.public.write
-def claim_winnings(self) -> None:
-    if self.status != RESOLVED:
-        raise gl.vm.UserError("market not resolved")
-    caller = gl.message.sender_address
-    record = self.bets.get(caller, None)
-    if record is None or record.outcome != self.resolution:
-        raise gl.vm.UserError("not a winner")
-    if self.claimed.get(caller, False):
-        raise gl.vm.UserError("already claimed")
-    winning_total = sum(
-        r.amount for r in self.bets.values() if r.outcome == self.resolution
+def resolve_with_ai(self, market_id: str, evidence: str) -> str:
+    assert market_id in self.market_questions, "Market not found"
+    assert self.market_statuses[market_id] == "closed", "Market must be closed before AI resolution"
+    assert len(evidence) > 0, "Evidence cannot be empty"
+    prompt = (
+        "You are resolving a prediction market. "
+        + "Question: " + self.market_questions[market_id]
+        + ". Outcome A: " + self.market_outcome_a[market_id]
+        + ". Outcome B: " + self.market_outcome_b[market_id]
+        + ". Evidence: " + evidence
+        + ". Return only A or B."
     )
-    share = record.amount * self.total_pot // winning_total
-    self.claimed[caller] = True
-    gl.send(caller, share)
+    result = gl.nondet.exec_prompt(prompt)
+    assert result == "A" or result == "B", "AI must return A or B"
+    self.market_winning_outcome[market_id] = result
+    self.market_statuses[market_id] = "resolved"
+    return result
 \`\`\`
 
-Mark \`self.claimed[caller] = True\` **before** calling \`gl.send\` — this is the standard reentrancy guard pattern.`,
+The \`@gl.public.write\` decorator (not \`.view\`) is required because you are writing state — storing the winning outcome and updating the market status.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address, u256, TreeMap
-from dataclasses import dataclass
 
-OPEN      = "OPEN"
-RESOLVED  = "RESOLVED"
-CANCELLED = "CANCELLED"
-MIN_BET   = 1_000_000_000_000_000  # 0.001 GEN in wei
+import json
+from genlayer import *
 
 
-@dataclass
-class BetRecord:
-    outcome: str
-    amount: u256
-    bettor: Address
-
-
-class PredictionMarket(gl.Contract):
-    question: str
-    bet_count: int
-    last_bettor: Address
+class PredictX(gl.Contract):
     owner: Address
-    market_id: u256
-    status: str
-    resolution: str
-    confidence: int
-    news_source: str
-    chart_url: str
-    total_pot: u256
-    bets: TreeMap[Address, BetRecord]
-    claimed: TreeMap[Address, bool]
+    platform_name: str
+    platform_description: str
 
-    def __init__(self, question: str, market_id: u256) -> None:
-        self.question = question
-        self.bet_count = 0
+    market_questions: TreeMap[str, str]
+    market_outcome_a: TreeMap[str, str]
+    market_outcome_b: TreeMap[str, str]
+    market_creators: TreeMap[str, Address]
+    market_min_stakes: TreeMap[str, u256]
+    market_statuses: TreeMap[str, str]
+    market_ids: DynArray[str]
+    market_count: u256
+
+    market_total_a: TreeMap[str, u256]
+    market_total_b: TreeMap[str, u256]
+    user_stakes_a: TreeMap[str, u256]
+    user_stakes_b: TreeMap[str, u256]
+
+    market_winning_outcome: TreeMap[str, str]
+    user_claimed: TreeMap[str, bool]
+
+    def __init__(self) -> None:
         self.owner = gl.message.sender_address
-        self.market_id = market_id
-        self.status = OPEN
-        self.resolution = ""
-        self.confidence = 0
-        self.news_source = "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd"
-        self.chart_url = "https://www.coingecko.com/en/coins/ethereum"
-        self.total_pot = 0
-        self.bets = TreeMap[Address, BetRecord]()
-        self.claimed = TreeMap[Address, bool]()
+        self.platform_name = "PredictX"
+        self.platform_description = "A GenLayer prediction market that uses AI-assisted resolution."
+        self.market_count = u256(0)
 
     @gl.public.view
-    def get_question(self) -> str:
-        return self.question
+    def get_platform_name(self) -> str:
+        return self.platform_name
+
+    @gl.public.view
+    def get_platform_description(self) -> str:
+        return self.platform_description
 
     @gl.public.view
     def get_owner(self) -> str:
-        return str(self.owner)
+        return self.owner.as_hex
 
     @gl.public.view
-    def get_status(self) -> str:
-        return self.status
-
-    @gl.public.view
-    def get_resolution(self) -> str:
-        return self.resolution
-
-    @gl.public.view
-    def get_total_pot(self) -> int:
-        return int(self.total_pot)
+    def get_contract_summary(self) -> str:
+        return self.platform_name + ": " + self.platform_description
 
     @gl.public.write
-    def transfer_ownership(self, new_owner: Address) -> None:
-        if gl.message.sender_address != self.owner:
-            raise gl.vm.UserError("unauthorized")
-        if new_owner == Address("0x0000000000000000000000000000000000000000"):
-            raise gl.vm.UserError("cannot transfer to zero address")
-        self.owner = new_owner
+    def update_platform_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update description"
+        assert len(new_description) > 0, "Description cannot be empty"
+        self.platform_description = new_description
+
+    @gl.public.write
+    def create_market(self, question: str, outcome_a: str, outcome_b: str, min_stake: u256) -> str:
+        assert len(question) > 0, "Question cannot be empty"
+        assert len(outcome_a) > 0, "Outcome A cannot be empty"
+        assert len(outcome_b) > 0, "Outcome B cannot be empty"
+        assert outcome_a != outcome_b, "Outcomes must be different"
+        assert min_stake > u256(0), "Minimum stake must be greater than zero"
+        market_id = str(self.market_count)
+        self.market_creators[market_id] = gl.message.sender_address
+        self.market_questions[market_id] = question
+        self.market_outcome_a[market_id] = outcome_a
+        self.market_outcome_b[market_id] = outcome_b
+        self.market_min_stakes[market_id] = min_stake
+        self.market_statuses[market_id] = "active"
+        self.market_ids.append(market_id)
+        self.market_count += u256(1)
+        return market_id
+
+    @gl.public.view
+    def get_market_json(self, market_id: str) -> str:
+        assert market_id in self.market_questions, "Market not found"
+        return json.dumps({
+            "id": market_id,
+            "creator": self.market_creators[market_id].as_hex,
+            "question": self.market_questions[market_id],
+            "outcome_a": self.market_outcome_a[market_id],
+            "outcome_b": self.market_outcome_b[market_id],
+            "min_stake": str(self.market_min_stakes[market_id]),
+            "status": self.market_statuses[market_id],
+        }, sort_keys=True)
+
+    @gl.public.view
+    def get_active_markets_json(self) -> str:
+        result = []
+        for market_id in self.market_ids:
+            if self.market_statuses[market_id] == "active":
+                result.append({
+                    "id": market_id,
+                    "creator": self.market_creators[market_id].as_hex,
+                    "question": self.market_questions[market_id],
+                    "outcome_a": self.market_outcome_a[market_id],
+                    "outcome_b": self.market_outcome_b[market_id],
+                    "min_stake": str(self.market_min_stakes[market_id]),
+                    "status": self.market_statuses[market_id],
+                })
+        return json.dumps(result, sort_keys=True)
+
+    @gl.public.view
+    def get_all_markets_json(self) -> str:
+        result = []
+        for market_id in self.market_ids:
+            result.append({
+                "id": market_id,
+                "creator": self.market_creators[market_id].as_hex,
+                "question": self.market_questions[market_id],
+                "outcome_a": self.market_outcome_a[market_id],
+                "outcome_b": self.market_outcome_b[market_id],
+                "min_stake": str(self.market_min_stakes[market_id]),
+                "status": self.market_statuses[market_id],
+            })
+        return json.dumps(result, sort_keys=True)
+
+    @gl.public.write
+    def close_market(self, market_id: str) -> None:
+        assert market_id in self.market_questions, "Market not found"
+        caller = gl.message.sender_address
+        creator = self.market_creators[market_id]
+        assert caller == creator or caller == self.owner, "Only creator or owner can close market"
+        assert self.market_statuses[market_id] == "active", "Only active markets can be closed"
+        self.market_statuses[market_id] = "closed"
 
     @gl.public.write.payable
-    def place_bet(self, outcome: str) -> None:
-        if self.status != OPEN:
-            raise gl.vm.UserError("market not open")
-        if outcome not in ["YES", "NO"]:
-            raise gl.vm.UserError("outcome must be YES or NO")
-        if gl.message.value < MIN_BET:
-            raise gl.vm.UserError("min bet 0.001 GEN")
-        self.bet_count += 1
-        self.last_bettor = gl.message.sender_address
-        self.bets[gl.message.sender_address] = BetRecord(
-            outcome=outcome, amount=gl.message.value, bettor=gl.message.sender_address
-        )
-        self.total_pot += gl.message.value
-
-    @gl.public.view
-    def get_bet_count(self) -> int:
-        return self.bet_count
-
-    @gl.public.view
-    def get_bet(self, bettor: Address) -> str:
-        record = self.bets.get(bettor, None)
-        if record is None:
-            return "NO_BET"
-        return record.outcome
+    def stake_on_outcome(self, market_id: str, outcome: str) -> None:
+        assert market_id in self.market_questions, "Market not found"
+        assert self.market_statuses[market_id] == "active", "Market is not active"
+        assert gl.message.sender_address != self.market_creators[market_id], "Creator cannot stake on own market"
+        assert gl.message.value >= self.market_min_stakes[market_id], "Stake is below minimum"
+        if market_id not in self.market_total_a:
+            self.market_total_a[market_id] = u256(0)
+        if market_id not in self.market_total_b:
+            self.market_total_b[market_id] = u256(0)
+        stake_key = market_id + "_" + gl.message.sender_address.as_hex
+        if outcome == "A":
+            if stake_key not in self.user_stakes_a:
+                self.user_stakes_a[stake_key] = u256(0)
+            self.user_stakes_a[stake_key] += gl.message.value
+            self.market_total_a[market_id] += gl.message.value
+        elif outcome == "B":
+            if stake_key not in self.user_stakes_b:
+                self.user_stakes_b[stake_key] = u256(0)
+            self.user_stakes_b[stake_key] += gl.message.value
+            self.market_total_b[market_id] += gl.message.value
+        else:
+            assert False, "Invalid outcome"
 
     @gl.public.write
-    def cancel(self) -> None:
-        if gl.message.sender_address != self.owner:
-            raise gl.vm.UserError("unauthorized")
-        if self.status != OPEN:
-            raise gl.vm.UserError("market not open")
-        self.status = CANCELLED
+    def resolve_market_manually(self, market_id: str, winning_outcome: str) -> None:
+        assert market_id in self.market_questions, "Market not found"
+        assert gl.message.sender_address == self.owner, "Only owner can resolve manually"
+        assert self.market_statuses[market_id] == "closed", "Market must be closed before resolution"
+        assert winning_outcome == "A" or winning_outcome == "B", "Invalid winning outcome"
+        self.market_winning_outcome[market_id] = winning_outcome
+        self.market_statuses[market_id] = "resolved"
 
     @gl.public.write
-    def claim_winnings(self) -> None:
-        pass  # TODO: implement proportional payout with double-claim prevention
+    def claim_winnings(self, market_id: str) -> None:
+        assert market_id in self.market_questions, "Market not found"
+        assert self.market_statuses[market_id] == "resolved", "Market is not resolved"
+        caller_hex = gl.message.sender_address.as_hex
+        claim_key = market_id + "_" + caller_hex
+        if claim_key in self.user_claimed:
+            assert self.user_claimed[claim_key] == False, "Already claimed"
+        winning_outcome = self.market_winning_outcome[market_id]
+        if winning_outcome == "A":
+            assert claim_key in self.user_stakes_a, "No winning stake found"
+        elif winning_outcome == "B":
+            assert claim_key in self.user_stakes_b, "No winning stake found"
+        else:
+            assert False, "Invalid resolved outcome"
+        self.user_claimed[claim_key] = True
 
-    def _leader_resolve(self) -> dict:
-        data = gl.nondet.web.get(self.news_source)
-        img  = gl.nondet.web.render(self.chart_url)
-        prompt = (
-            f"Price API data: {data[:800]}\\n"
-            f"Question: {self.question}\\n"
-            'Use both the text data AND the chart image. '
-            'JSON: {"verdict": "YES or NO", "confidence": 0-100}'
-        )
-        return gl.nondet.exec_prompt(prompt, response_format="json", images=[img])
-
-    def _validate_resolution(self, r) -> bool:
+    @gl.public.view
+    def get_resolution_prompt(self, market_id: str, evidence: str) -> str:
+        assert market_id in self.market_questions, "Market not found"
         return (
-            isinstance(r, dict)
-            and r.get("verdict") in ["YES", "NO"]
-            and 0 <= int(r.get("confidence", -1)) <= 100
+            "Resolve this prediction market using the evidence provided. Question: "
+            + self.market_questions[market_id]
+            + " Outcome A: " + self.market_outcome_a[market_id]
+            + " Outcome B: " + self.market_outcome_b[market_id]
+            + " Evidence: " + evidence
         )
 
-    @gl.public.write
-    def resolve(self) -> None:
-        if self.status != OPEN:
-            raise gl.vm.UserError("market not open")
-        result = gl.vm.run_nondet_unsafe(
-            lambda: self._leader_resolve(),
-            lambda r: self._validate_resolution(r),
-        )
-        self.resolution = result["verdict"]
-        self.confidence = int(result.get("confidence", 0))
-        self.status = RESOLVED
+    # TODO: Add resolve_with_ai(self, market_id: str, evidence: str) -> str here
 `,
-  task: "Implement `claim_winnings()`: verify the market is RESOLVED, verify the caller bet on the winning side, prevent double-claiming with `self.claimed`, calculate a proportional share of `total_pot`, and send it with `gl.send`.",
+  task:
+    'Add `@gl.public.write` method `resolve_with_ai(self, market_id: str, evidence: str) -> str`. Validate the market is closed and evidence is non-empty. Build a prompt ending with `". Return only A or B."`, call `gl.nondet.exec_prompt(prompt)`, assert the result is `"A"` or `"B"`, store it as the winning outcome, set status to `"resolved"`, and return the result.',
   hints: [
-    "Check `self.status != RESOLVED` and `self.claimed.get(caller, False)` for early exits, then verify `record.outcome == self.resolution`.",
-    "Calculate winning side total: iterate `self.bets.values()` summing `r.amount` where `r.outcome == self.resolution`.",
-    "Set `self.claimed[caller] = True` before calling `gl.send(caller, share)` — this prevents reentrancy; share = `record.amount * self.total_pot // winning_total`.",
+    'End the prompt with: `". Return only A or B."`',
+    "Call: `result = gl.nondet.exec_prompt(prompt)`",
+    'Assert: `assert result == "A" or result == "B", "AI must return A or B"`',
   ],
 };
 

@@ -3,57 +3,59 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 3,
   projectPath: "PREDICTION_MARKET",
-  explanation: `## Lesson 3 — Input Validation & UserError
+  explanation: `## Lesson 3 — \`@gl.public.view\`: Read-Only State Exposure
 
-A prediction market that accepts any string as an outcome is broken — PredictX should only allow \`"YES"\` or \`"NO"\` bets. Validating inputs before mutating state is a core smart-contract discipline: once bad data is written on-chain, it cannot be undone.
-
-GenLayer provides \`gl.vm.UserError\` for communicating user-visible errors back to the caller. Raising it rolls back the entire transaction, so no state changes persist.
+\`@gl.public.view\` marks a method as read-only. View methods can read contract state but must not modify it. They are how frontends display public information — and they cost **no gas** for the caller.
 
 \`\`\`python
-@gl.public.write
-def place_bet(self, outcome: str) -> None:
-    if outcome not in ["YES", "NO"]:
-        raise gl.vm.UserError("outcome must be YES or NO")
-    self.bet_count += 1
-    self.last_bettor = gl.message.sender_address
+@gl.public.view
+def get_platform_name(self) -> str:
+    return self.platform_name
 \`\`\`
 
-Always validate **before** mutating state. If you incremented \`bet_count\` first and then raised an error, the increment would be rolled back anyway — but the pattern of "validate first, write second" is cleaner and easier to audit.
+The starter code already has \`get_platform_name()\` implemented. Your job is to add two more view methods following the same pattern.
 
-This same pattern will protect every mutating method in PredictX: only the owner can cancel, only a resolved market can pay out, and only valid outcomes can be bet on.`,
+### Returning an Address as a string
+
+The \`owner\` field has type \`Address\`. To return it as a readable hex string, use the \`.as_hex\` property:
+
+\`\`\`python
+@gl.public.view
+def get_owner(self) -> str:
+    return self.owner.as_hex
+\`\`\`
+
+\`.as_hex\` converts the on-chain \`Address\` type into a standard \`0x...\` hex string that any frontend can display or compare. The return type annotation is \`str\` because \`.as_hex\` produces a plain string.
+
+### Rules for view methods
+
+- Decorate with \`@gl.public.view\` — without it, the method is not callable externally.
+- Return type must match — annotate accurately so callers and tooling know what to expect.
+- Never assign to \`self.*\` — the runtime will reject state changes inside a view.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address
+
+from genlayer import *
 
 
-class PredictionMarket(gl.Contract):
-    question: str
-    bet_count: int
-    last_bettor: Address
+class PredictX(gl.Contract):
+    owner: Address
+    platform_name: str
+    platform_description: str
 
-    def __init__(self, question: str) -> None:
-        self.question = question
-        self.bet_count = 0
-
-    @gl.public.view
-    def get_question(self) -> str:
-        return self.question
-
-    @gl.public.write
-    def place_bet(self, outcome: str) -> None:
-        # TODO: raise gl.vm.UserError if outcome is not "YES" or "NO"
-        self.bet_count += 1
-        self.last_bettor = gl.message.sender_address
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.platform_name = "PredictX"
+        self.platform_description = "A GenLayer prediction market that uses AI-assisted resolution."
 
     @gl.public.view
-    def get_bet_count(self) -> int:
-        return self.bet_count
+    def get_platform_name(self) -> str:
+        return self.platform_name
 `,
-  task: "Add validation to `place_bet()` that raises `gl.vm.UserError` if the outcome is not `\"YES\"` or `\"NO\"`.",
+  task: "Add two new view methods: `get_platform_description()` that returns `self.platform_description`, and `get_owner()` that returns the owner address as a hex string using `self.owner.as_hex`.",
   hints: [
-    "Always validate inputs before modifying any state — raises roll back the whole transaction.",
-    "Use `raise gl.vm.UserError(\"message\")` to return a user-visible error to the caller.",
-    "`if outcome not in [\"YES\", \"NO\"]: raise gl.vm.UserError(\"outcome must be YES or NO\")`",
+    "Model both new methods on the existing `get_platform_name()` — same decorator, same pattern.",
+    "`get_owner()` should have return type `str` and return `self.owner.as_hex` (the Address type has an `.as_hex` property).",
+    "Both methods need `@gl.public.view` above the `def` line and a `return` statement.",
   ],
 };
 

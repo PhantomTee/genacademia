@@ -3,83 +3,82 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 6,
   projectPath: "PREDICTION_MARKET",
-  explanation: `## Lesson 6 — gl.nondet.exec_prompt
+  explanation: `## Lesson 6 — Persistent Storage Fields: TreeMap
 
-PredictX needs to resolve itself automatically. Rather than relying on a human oracle, we use GenLayer's killer feature: **non-deterministic execution**. \`gl.nondet.exec_prompt\` sends a prompt to an LLM and returns the answer — and GenLayer's consensus mechanism ensures all validators agree on the result.
+A single prediction market needs multiple pieces of data: the question, two possible outcomes, the creator address, a minimum stake, and a status. GenLayer doesn't support structs — instead, each field for a market is stored in a **separate \`TreeMap\` keyed by market ID**.
+
+### What is a TreeMap?
+
+A \`TreeMap\` is a persistent ordered key-value map stored on-chain. You declare it like any other state variable:
 
 \`\`\`python
-@gl.public.write
-def resolve(self) -> None:
-    prompt = "Has ETH exceeded $10,000 by December 31, 2025? Answer YES or NO only."
-    self.resolution = gl.nondet.exec_prompt(prompt).strip().upper()
+market_questions: TreeMap[str, str]
+market_creators: TreeMap[str, Address]
 \`\`\`
 
-The call looks like a normal Python function, but under the hood the leader node runs the LLM and validators check the result meets your equivalence criteria. For text-format prompts, the default equivalence is string equality after normalisation.
+The first type parameter is the key type, the second is the value type. Common combinations:
 
-A few prompt-writing rules to live by:
-- Keep prompts short and unambiguous.
-- Ask for a specific format ("Answer YES or NO only").
-- \`.strip().upper()\` normalises the response so "yes", " YES ", and "YES" all store identically.
+| Declaration | Use case |
+|---|---|
+| \`TreeMap[str, str]\` | Text fields (question, outcome, status) |
+| \`TreeMap[str, Address]\` | Creator or owner per market |
+| \`TreeMap[str, u256]\` | Numeric values (amounts, counters) |
 
-This is the core of what makes GenLayer contracts "intelligent" — the ability to resolve real-world questions with AI, on-chain, with cryptographic consensus.`,
+### TreeMaps do not need initialisation
+
+Unlike regular fields, \`TreeMap\` instances start empty automatically. Do **not** add them to \`__init__\` — they are ready to use the moment you declare them.
+
+\`\`\`python
+class PredictX(gl.Contract):
+    market_questions: TreeMap[str, str]   # ready to use immediately
+
+    def __init__(self) -> None:
+        pass  # no TreeMap init needed
+\`\`\`
+
+Reading a missing key returns the zero value for that type (\`""\` for strings, the zero address for \`Address\`, \`u256(0)\` for numbers).`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address, u256
+
+from genlayer import *
 
 
-class PredictionMarket(gl.Contract):
-    question: str
-    bet_count: int
-    last_bettor: Address
+class PredictX(gl.Contract):
     owner: Address
-    market_id: u256
-    is_open: bool
-    resolution: str
+    platform_name: str
+    platform_description: str
 
-    def __init__(self, question: str, market_id: u256) -> None:
-        self.question = question
-        self.bet_count = 0
+    def __init__(self) -> None:
         self.owner = gl.message.sender_address
-        self.market_id = market_id
-        self.is_open = True
-        self.resolution = ""
+        self.platform_name = "PredictX"
+        self.platform_description = "A GenLayer prediction market that uses AI-assisted resolution."
 
     @gl.public.view
-    def get_question(self) -> str:
-        return self.question
+    def get_platform_name(self) -> str:
+        return self.platform_name
+
+    @gl.public.view
+    def get_platform_description(self) -> str:
+        return self.platform_description
 
     @gl.public.view
     def get_owner(self) -> str:
-        return str(self.owner)
-
-    @gl.public.write
-    def place_bet(self, outcome: str) -> None:
-        if outcome not in ["YES", "NO"]:
-            raise gl.vm.UserError("outcome must be YES or NO")
-        self.bet_count += 1
-        self.last_bettor = gl.message.sender_address
+        return self.owner.as_hex
 
     @gl.public.view
-    def get_bet_count(self) -> int:
-        return self.bet_count
+    def get_contract_summary(self) -> str:
+        return self.platform_name + ": " + self.platform_description
 
     @gl.public.write
-    def cancel(self) -> None:
-        if gl.message.sender_address != self.owner:
-            raise gl.vm.UserError("unauthorized")
-        if not self.is_open:
-            raise gl.vm.UserError("already cancelled")
-        self.is_open = False
-
-    @gl.public.write
-    def resolve(self) -> None:
-        pass
+    def update_platform_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update description"
+        assert len(new_description) > 0, "Description cannot be empty"
+        self.platform_description = new_description
 `,
-  task: "Implement `resolve()` to call `gl.nondet.exec_prompt` asking whether ETH exceeded $10,000 by December 31, 2025, then store the stripped, uppercased result in `self.resolution`.",
+  task: "Add five class-level storage fields: `market_questions: TreeMap[str, str]`, `market_outcome_a: TreeMap[str, str]`, `market_outcome_b: TreeMap[str, str]`, `market_creators: TreeMap[str, Address]`, and `market_statuses: TreeMap[str, str]`. Do not initialize them in `__init__`.",
   hints: [
-    "`gl.nondet.exec_prompt(prompt)` calls an LLM and returns a string — keep the prompt short and ask for a clear format.",
-    "A good prompt: `\"Has ETH exceeded $10,000 by December 31, 2025? Answer YES or NO only.\"`",
-    "`self.resolution = gl.nondet.exec_prompt(prompt).strip().upper()` stores a normalised YES or NO.",
+    "All five fields are declared at class level with type annotations, just like `owner: Address`.",
+    "TreeMaps do not need initialization in `__init__` — they are automatically empty.",
+    "The types are: `TreeMap[str, str]` for text fields, `TreeMap[str, Address]` for the creator.",
   ],
 };
 

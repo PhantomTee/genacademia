@@ -3,116 +3,98 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 11,
   projectPath: "PREDICTION_MARKET",
-  explanation: `## Lesson 11 — TreeMap & DynArray
+  explanation: `## Lesson 11 — DynArray: Indexing for Frontend Listing
 
-A single \`bet_count\` integer tells us how many people bet, but not *who* or *what* they bet. PredictX needs to map each bettor's address to their chosen outcome so we can pay winners later.
+A counter alone (\`market_count\`) doesn't let you list markets — you'd need to guess IDs. A \`DynArray[str]\` stores IDs in insertion order, making it possible to iterate all markets.
 
-\`TreeMap[K, V]\` is GenLayer's on-chain key-value store. Unlike a Python \`dict\`, it persists across calls and supports the full range of on-chain key types including \`Address\`.
+\`self.market_ids.append(market_id)\` adds each new ID when a market is created. Unlike a \`TreeMap\`, a \`DynArray\` is an ordered list — you can loop over it directly.
 
 \`\`\`python
-from genlayer.types import Address, TreeMap
-
-class PredictionMarket(gl.Contract):
-    bets: TreeMap[Address, str]
-
-    def __init__(self, ...) -> None:
-        self.bets = TreeMap[Address, str]()
-
-    @gl.public.write
-    def place_bet(self, outcome: str) -> None:
-        self.bets[gl.message.sender_address] = outcome
-
-    @gl.public.view
-    def get_bet(self, bettor: Address) -> str:
-        return self.bets.get(bettor, "NO_BET")
+market_ids: DynArray[str]
 \`\`\`
 
-Use \`.get(key, default)\` for safe reads — if the bettor hasn't placed a bet, you get back \`"NO_BET"\` instead of a \`KeyError\`. Direct bracket access (\`self.bets[key]\`) raises if the key is missing.
+DynArray does **not** need initialization in \`__init__\` — it starts empty automatically.
 
-\`DynArray[T]\` works like a resizable list: \`append()\`, index access, and \`len()\`. You'll use it to track bettor addresses for iteration during payout.`,
+The typical iteration pattern:
+
+\`\`\`python
+for mid in self.market_ids:
+    # do something with mid
+\`\`\`
+
+This is the foundation for all future listing and filtering views on PredictX.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address, u256, TreeMap
+
+from genlayer import *
 
 
-class PredictionMarket(gl.Contract):
-    question: str
-    bet_count: int
-    last_bettor: Address
+class PredictX(gl.Contract):
     owner: Address
-    market_id: u256
-    is_open: bool
-    resolution: str
-    confidence: int
-    news_source: str
-    bets: TreeMap[Address, str]
+    platform_name: str
+    platform_description: str
 
-    def __init__(self, question: str, market_id: u256) -> None:
-        self.question = question
-        self.bet_count = 0
+    market_questions: TreeMap[str, str]
+    market_outcome_a: TreeMap[str, str]
+    market_outcome_b: TreeMap[str, str]
+    market_creators: TreeMap[str, Address]
+    market_min_stakes: TreeMap[str, u256]
+    market_statuses: TreeMap[str, str]
+    market_count: u256
+
+    def __init__(self) -> None:
         self.owner = gl.message.sender_address
-        self.market_id = market_id
-        self.is_open = True
-        self.resolution = ""
-        self.confidence = 0
-        self.news_source = "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd"
-        # TODO: initialise self.bets as TreeMap[Address, str]()
+        self.platform_name = "PredictX"
+        self.platform_description = "A GenLayer prediction market that uses AI-assisted resolution."
+        self.market_count = u256(0)
 
     @gl.public.view
-    def get_question(self) -> str:
-        return self.question
+    def get_platform_name(self) -> str:
+        return self.platform_name
+
+    @gl.public.view
+    def get_platform_description(self) -> str:
+        return self.platform_description
 
     @gl.public.view
     def get_owner(self) -> str:
-        return str(self.owner)
-
-    @gl.public.write
-    def place_bet(self, outcome: str) -> None:
-        if outcome not in ["YES", "NO"]:
-            raise gl.vm.UserError("outcome must be YES or NO")
-        self.bet_count += 1
-        self.last_bettor = gl.message.sender_address
-        # TODO: store outcome in self.bets keyed by caller's address
+        return self.owner.as_hex
 
     @gl.public.view
-    def get_bet_count(self) -> int:
-        return self.bet_count
-
-    @gl.public.view
-    def get_bet(self, bettor: Address) -> str:
-        pass
+    def get_contract_summary(self) -> str:
+        return self.platform_name + ": " + self.platform_description
 
     @gl.public.write
-    def cancel(self) -> None:
-        if gl.message.sender_address != self.owner:
-            raise gl.vm.UserError("unauthorized")
-        if not self.is_open:
-            raise gl.vm.UserError("already cancelled")
-        self.is_open = False
-
-    def _safe_text(self, text: str) -> str:
-        return text.replace("\\n", " ").replace("[", "").replace("]", "")
+    def update_platform_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update description"
+        assert len(new_description) > 0, "Description cannot be empty"
+        self.platform_description = new_description
 
     @gl.public.write
-    def resolve(self) -> None:
-        data = gl.nondet.web.get(self.news_source)
-        safe_q = self._safe_text(self.question)
-        prompt = (
-            f"Context: {data[:1500]}\\n\\n"
-            f"[MARKET QUESTION: {safe_q}]\\n"
-            'Respond with JSON: {"verdict": "YES or NO", "confidence": 0-100}'
-        )
-        result = gl.nondet.exec_prompt(prompt, response_format="json")
-        if int(result["confidence"]) < 70:
-            raise gl.vm.UserError("confidence too low — try again")
-        self.resolution = result["verdict"]
-        self.confidence = int(result["confidence"])
+    def create_market(self, question: str, outcome_a: str, outcome_b: str, min_stake: u256) -> str:
+        assert len(question) > 0, "Question cannot be empty"
+        assert len(outcome_a) > 0, "Outcome A cannot be empty"
+        assert len(outcome_b) > 0, "Outcome B cannot be empty"
+        assert outcome_a != outcome_b, "Outcomes must be different"
+        assert min_stake > u256(0), "Minimum stake must be greater than zero"
+
+        market_id = str(self.market_count)
+
+        self.market_creators[market_id] = gl.message.sender_address
+        self.market_questions[market_id] = question
+        self.market_outcome_a[market_id] = outcome_a
+        self.market_outcome_b[market_id] = outcome_b
+        self.market_min_stakes[market_id] = min_stake
+        self.market_statuses[market_id] = "active"
+
+        self.market_count += u256(1)
+
+        return market_id
 `,
-  task: "Initialise `self.bets` as a `TreeMap[Address, str]()` in `__init__`, update `place_bet()` to store the caller's outcome in the map, and implement `get_bet()` to safely return a bettor's chosen outcome.",
+  task: "Add `market_ids: DynArray[str]` as a class-level field and call `self.market_ids.append(market_id)` inside `create_market` after all data is stored but before the return.",
   hints: [
-    "Declare `TreeMap[Address, str]` as a class annotation and initialise it in `__init__`: `self.bets = TreeMap[Address, str]()`.",
-    "In `place_bet`, after validation: `self.bets[gl.message.sender_address] = outcome`.",
-    "Use `.get()` for safe reads: `return self.bets.get(bettor, \"NO_BET\")` returns a default if the address has no bet.",
+    "Declare `market_ids: DynArray[str]` alongside the other class-level fields.",
+    "DynArray does not need initialization in `__init__` — it starts empty.",
+    "Add `self.market_ids.append(market_id)` inside `create_market`, after storing market data but before `return market_id`.",
   ],
 };
 

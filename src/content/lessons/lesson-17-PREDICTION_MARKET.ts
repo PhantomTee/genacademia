@@ -3,161 +3,173 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 17,
   projectPath: "PREDICTION_MARKET",
-  explanation: `## Lesson 17 — Non-Comparative Equivalence
+  explanation: `## Lesson 17 — Input Validation: Preventing Bad Stakes
 
-When validators check a leader's result, the naive approach is to re-run the same LLM call and demand identical output. That fails in practice: LLMs are non-deterministic, prices change by the millisecond, and different validators may hit different web snapshots.
+The creator shouldn't be able to bet on their own market — that's a conflict of interest that could compromise the integrity of the prediction.
 
-**Non-comparative equivalence** solves this: instead of reproducing the leader's answer, each validator checks whether the answer is *plausible* — structurally correct and within expected bounds — without running the LLM again.
-
-For PredictX's resolution result \`{"verdict": "YES", "confidence": 87}\`, a good non-comparative check is:
+This lesson adds one targeted assert to \`stake_on_outcome\`:
 
 \`\`\`python
-def _validate_resolution(self, r) -> bool:
-    if not isinstance(r, dict):
-        return False
-    verdict = r.get("verdict")
-    confidence = r.get("confidence", -1)
-    return (
-        verdict in ["YES", "NO"]
-        and isinstance(confidence, (int, float))
-        and 0 <= int(confidence) <= 100
-    )
+assert gl.message.sender_address != self.market_creators[market_id], "Creator cannot stake on own market"
 \`\`\`
 
-This validator catches all invalid responses (wrong type, missing keys, out-of-range confidence, garbage verdict) while accepting any legitimate YES/NO answer regardless of which model replica answered.
+Note the \`!=\` (not equal) — this *rejects* the creator, letting everyone else through.
 
-The key insight: validators are checking the **contract** of the return value, not replicating the computation. This keeps consensus fast and deterministic while still protecting against a malicious or buggy leader node producing a corrupted result.`,
+**Placement matters.** The assert order in \`stake_on_outcome\` should be:
+1. Market exists
+2. Market is active
+3. **Creator cannot stake (new)**
+4. Sent value meets the minimum
+
+Checking existence and status first gives the caller a clear error before the creator check is even reached.
+
+This is a common pattern in financial contracts: validate structural conditions (does the market exist? is it open?) before enforcing business rules (who is allowed?).`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address, u256, TreeMap
-from dataclasses import dataclass
 
-OPEN      = "OPEN"
-RESOLVED  = "RESOLVED"
-CANCELLED = "CANCELLED"
+import json
+from genlayer import *
 
 
-@dataclass
-class BetRecord:
-    outcome: str
-    amount: u256
-    bettor: Address
-
-
-class PredictionMarket(gl.Contract):
-    question: str
-    bet_count: int
-    last_bettor: Address
+class PredictX(gl.Contract):
     owner: Address
-    market_id: u256
-    status: str
-    resolution: str
-    confidence: int
-    news_source: str
-    bets: TreeMap[Address, BetRecord]
+    platform_name: str
+    platform_description: str
 
-    def __init__(self, question: str, market_id: u256) -> None:
-        self.question = question
-        self.bet_count = 0
+    market_questions: TreeMap[str, str]
+    market_outcome_a: TreeMap[str, str]
+    market_outcome_b: TreeMap[str, str]
+    market_creators: TreeMap[str, Address]
+    market_min_stakes: TreeMap[str, u256]
+    market_statuses: TreeMap[str, str]
+    market_count: u256
+    market_ids: DynArray[str]
+    market_total_a: TreeMap[str, u256]
+    market_total_b: TreeMap[str, u256]
+
+    def __init__(self) -> None:
         self.owner = gl.message.sender_address
-        self.market_id = market_id
-        self.status = OPEN
-        self.resolution = ""
-        self.confidence = 0
-        self.news_source = "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd"
-        self.bets = TreeMap[Address, BetRecord]()
+        self.platform_name = "PredictX"
+        self.platform_description = "A GenLayer prediction market that uses AI-assisted resolution."
+        self.market_count = u256(0)
 
     @gl.public.view
-    def get_question(self) -> str:
-        return self.question
+    def get_platform_name(self) -> str:
+        return self.platform_name
+
+    @gl.public.view
+    def get_platform_description(self) -> str:
+        return self.platform_description
 
     @gl.public.view
     def get_owner(self) -> str:
-        return str(self.owner)
+        return self.owner.as_hex
 
     @gl.public.view
-    def get_status(self) -> str:
-        return self.status
+    def get_contract_summary(self) -> str:
+        return self.platform_name + ": " + self.platform_description
+
+    @gl.public.write
+    def update_platform_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update description"
+        assert len(new_description) > 0, "Description cannot be empty"
+        self.platform_description = new_description
+
+    @gl.public.write
+    def create_market(self, question: str, outcome_a: str, outcome_b: str, min_stake: u256) -> str:
+        assert len(question) > 0, "Question cannot be empty"
+        assert len(outcome_a) > 0, "Outcome A cannot be empty"
+        assert len(outcome_b) > 0, "Outcome B cannot be empty"
+        assert outcome_a != outcome_b, "Outcomes must be different"
+        assert min_stake > u256(0), "Minimum stake must be greater than zero"
+
+        market_id = str(self.market_count)
+
+        self.market_creators[market_id] = gl.message.sender_address
+        self.market_questions[market_id] = question
+        self.market_outcome_a[market_id] = outcome_a
+        self.market_outcome_b[market_id] = outcome_b
+        self.market_min_stakes[market_id] = min_stake
+        self.market_statuses[market_id] = "active"
+
+        self.market_count += u256(1)
+        self.market_ids.append(market_id)
+
+        return market_id
 
     @gl.public.view
-    def get_resolution(self) -> str:
-        return self.resolution
-
-    @gl.public.write
-    def transfer_ownership(self, new_owner: Address) -> None:
-        if gl.message.sender_address != self.owner:
-            raise gl.vm.UserError("unauthorized")
-        if new_owner == Address("0x0000000000000000000000000000000000000000"):
-            raise gl.vm.UserError("cannot transfer to zero address")
-        self.owner = new_owner
-
-    @gl.public.write
-    def place_bet(self, outcome: str) -> None:
-        if self.status != OPEN:
-            raise gl.vm.UserError("market not open")
-        if outcome not in ["YES", "NO"]:
-            raise gl.vm.UserError("outcome must be YES or NO")
-        self.bet_count += 1
-        self.last_bettor = gl.message.sender_address
-        self.bets[gl.message.sender_address] = BetRecord(
-            outcome=outcome, amount=0, bettor=gl.message.sender_address
-        )
+    def get_market_json(self, market_id: str) -> str:
+        assert market_id in self.market_questions, "Market not found"
+        return json.dumps({
+            "id": market_id,
+            "creator": self.market_creators[market_id].as_hex,
+            "question": self.market_questions[market_id],
+            "outcome_a": self.market_outcome_a[market_id],
+            "outcome_b": self.market_outcome_b[market_id],
+            "min_stake": str(self.market_min_stakes[market_id]),
+            "status": self.market_statuses[market_id],
+        }, sort_keys=True)
 
     @gl.public.view
-    def get_bet_count(self) -> int:
-        return self.bet_count
+    def get_active_markets_json(self) -> str:
+        result = []
+        for market_id in self.market_ids:
+            if self.market_statuses[market_id] == "active":
+                result.append({
+                    "id": market_id,
+                    "creator": self.market_creators[market_id].as_hex,
+                    "question": self.market_questions[market_id],
+                    "outcome_a": self.market_outcome_a[market_id],
+                    "outcome_b": self.market_outcome_b[market_id],
+                    "min_stake": str(self.market_min_stakes[market_id]),
+                    "status": self.market_statuses[market_id],
+                })
+        return json.dumps(result, sort_keys=True)
 
     @gl.public.view
-    def get_bet(self, bettor: Address) -> str:
-        record = self.bets.get(bettor, None)
-        if record is None:
-            return "NO_BET"
-        return record.outcome
+    def get_all_markets_json(self) -> str:
+        result = []
+        for market_id in self.market_ids:
+            result.append({
+                "id": market_id,
+                "creator": self.market_creators[market_id].as_hex,
+                "question": self.market_questions[market_id],
+                "outcome_a": self.market_outcome_a[market_id],
+                "outcome_b": self.market_outcome_b[market_id],
+                "min_stake": str(self.market_min_stakes[market_id]),
+                "status": self.market_statuses[market_id],
+            })
+        return json.dumps(result, sort_keys=True)
 
     @gl.public.write
-    def cancel(self) -> None:
-        if gl.message.sender_address != self.owner:
-            raise gl.vm.UserError("unauthorized")
-        if self.status != OPEN:
-            raise gl.vm.UserError("market not open")
-        self.status = CANCELLED
+    def close_market(self, market_id: str) -> None:
+        assert market_id in self.market_questions, "Market not found"
+        caller = gl.message.sender_address
+        creator = self.market_creators[market_id]
+        assert caller == creator or caller == self.owner, "Only creator or owner can close market"
+        assert self.market_statuses[market_id] == "active", "Market is not active"
+        self.market_statuses[market_id] = "closed"
 
-    def _leader_resolve(self) -> dict:
-        data = gl.nondet.web.get(self.news_source)
-        prompt = (
-            f"Context: {data[:1500]}\\n"
-            f"Question: {self.question}\\n"
-            'JSON: {"verdict": "YES or NO", "confidence": 0-100}'
-        )
-        return gl.nondet.exec_prompt(prompt, response_format="json")
-
-    def _validate_resolution(self, r) -> bool:
-        # TODO: rewrite this — currently uses exact equality (wrong approach).
-        # Validators should check the result is structurally valid,
-        # NOT re-run the LLM and compare outputs.
-        try:
-            other = self._leader_resolve()
-            return r == other
-        except Exception:
-            return False
-
-    @gl.public.write
-    def resolve(self) -> None:
-        if self.status != OPEN:
-            raise gl.vm.UserError("market not open")
-        result = gl.vm.run_nondet_unsafe(
-            lambda: self._leader_resolve(),
-            lambda r: self._validate_resolution(r),
-        )
-        self.resolution = result["verdict"]
-        self.confidence = int(result.get("confidence", 0))
-        self.status = RESOLVED
+    @gl.public.write.payable
+    def stake_on_outcome(self, market_id: str, outcome: str) -> None:
+        assert market_id in self.market_questions, "Market not found"
+        assert self.market_statuses[market_id] == "active", "Market is not active"
+        assert gl.message.value >= self.market_min_stakes[market_id], "Stake is below minimum"
+        if outcome == "A":
+            if market_id not in self.market_total_a:
+                self.market_total_a[market_id] = u256(0)
+            self.market_total_a[market_id] += gl.message.value
+        elif outcome == "B":
+            if market_id not in self.market_total_b:
+                self.market_total_b[market_id] = u256(0)
+            self.market_total_b[market_id] += gl.message.value
+        else:
+            assert False, "Invalid outcome: must be A or B"
 `,
-  task: "Rewrite `_validate_resolution(self, r) -> bool` to use non-comparative equivalence: verify that `r` is a dict with `\"verdict\"` equal to `\"YES\"` or `\"NO\"` and `\"confidence\"` in the range 0–100, without calling the LLM or `web.get` again.",
+  task: "Add one assert inside `stake_on_outcome`: `assert gl.message.sender_address != self.market_creators[market_id], \"Creator cannot stake on own market\"`. Place it after the active-status check and before the value check.",
   hints: [
-    "Non-comparative means validators only inspect the structure of `r` — no re-running `_leader_resolve()` or any LLM call inside the validator.",
-    "Check: `isinstance(r, dict)` first, then `r.get(\"verdict\") in [\"YES\", \"NO\"]`, then validate the confidence range.",
-    "`return isinstance(r, dict) and r.get(\"verdict\") in [\"YES\", \"NO\"] and 0 <= int(r.get(\"confidence\", -1)) <= 100`",
+    "Add the new assert after `assert self.market_statuses[market_id] == \"active\"`.",
+    "The assert uses `!=` to reject the creator: `gl.message.sender_address != self.market_creators[market_id]`",
+    "Error message must be exactly: `\"Creator cannot stake on own market\"`",
   ],
 };
 

@@ -3,131 +3,121 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 13,
   projectPath: "PREDICTION_MARKET",
-  explanation: `## Lesson 13 — Address Type & Ownership
+  explanation: `## Lesson 13 — Index + Filter Loops: Listing Active Records
 
-PredictX markets may need to transfer control — for example when a market creator wants to hand off a market to a DAO or multi-sig. The \`transfer_ownership\` function does this with two safety guards.
+Now that \`market_ids\` holds every market ID in order, you can build filtered list views. The standard pattern:
 
-**Guard 1 — Only the current owner can transfer:**
 \`\`\`python
-if gl.message.sender_address != self.owner:
-    raise gl.vm.UserError("unauthorized")
+result = []
+for market_id in self.market_ids:
+    if self.market_statuses[market_id] == "active":
+        result.append({
+            "id": market_id,
+            "creator": self.market_creators[market_id].as_hex,
+            "question": self.market_questions[market_id],
+            "outcome_a": self.market_outcome_a[market_id],
+            "outcome_b": self.market_outcome_b[market_id],
+            "min_stake": str(self.market_min_stakes[market_id]),
+            "status": self.market_statuses[market_id],
+        })
+return json.dumps(result, sort_keys=True)
 \`\`\`
 
-**Guard 2 — Reject the zero address:**
-The zero address (\`0x0000...0000\`) is a common burn/null address. Transferring ownership there would lock the contract forever.
-\`\`\`python
-if new_owner == Address("0x0000000000000000000000000000000000000000"):
-    raise gl.vm.UserError("cannot transfer to zero address")
-\`\`\`
+1. Start with an empty list
+2. Loop over the index (\`self.market_ids\`)
+3. Check the condition
+4. Append matching records as dicts
+5. Return \`json.dumps(result)\`
 
-\`Address\` values support \`==\` and \`!=\` comparison directly. Never compare addresses as strings — string comparison is case-sensitive and won't catch checksum variants.
-
-After both guards pass, the transfer is a single assignment:
-\`\`\`python
-self.owner = new_owner
-\`\`\`
-
-This pattern — check caller, check argument validity, then mutate — is the standard form for any privileged write operation in a smart contract.`,
+This pattern works for any filtered view — open jobs, active cases, pending proposals — across all GenLayer contracts.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address, u256, TreeMap
-from dataclasses import dataclass
+
+import json
+from genlayer import *
 
 
-@dataclass
-class BetRecord:
-    outcome: str
-    amount: u256
-    bettor: Address
-
-
-class PredictionMarket(gl.Contract):
-    question: str
-    bet_count: int
-    last_bettor: Address
+class PredictX(gl.Contract):
     owner: Address
-    market_id: u256
-    is_open: bool
-    resolution: str
-    confidence: int
-    news_source: str
-    bets: TreeMap[Address, BetRecord]
+    platform_name: str
+    platform_description: str
 
-    def __init__(self, question: str, market_id: u256) -> None:
-        self.question = question
-        self.bet_count = 0
+    market_questions: TreeMap[str, str]
+    market_outcome_a: TreeMap[str, str]
+    market_outcome_b: TreeMap[str, str]
+    market_creators: TreeMap[str, Address]
+    market_min_stakes: TreeMap[str, u256]
+    market_statuses: TreeMap[str, str]
+    market_count: u256
+    market_ids: DynArray[str]
+
+    def __init__(self) -> None:
         self.owner = gl.message.sender_address
-        self.market_id = market_id
-        self.is_open = True
-        self.resolution = ""
-        self.confidence = 0
-        self.news_source = "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd"
-        self.bets = TreeMap[Address, BetRecord]()
+        self.platform_name = "PredictX"
+        self.platform_description = "A GenLayer prediction market that uses AI-assisted resolution."
+        self.market_count = u256(0)
 
     @gl.public.view
-    def get_question(self) -> str:
-        return self.question
+    def get_platform_name(self) -> str:
+        return self.platform_name
+
+    @gl.public.view
+    def get_platform_description(self) -> str:
+        return self.platform_description
 
     @gl.public.view
     def get_owner(self) -> str:
-        return str(self.owner)
-
-    @gl.public.write
-    def transfer_ownership(self, new_owner: Address) -> None:
-        pass
-
-    @gl.public.write
-    def place_bet(self, outcome: str) -> None:
-        if outcome not in ["YES", "NO"]:
-            raise gl.vm.UserError("outcome must be YES or NO")
-        self.bet_count += 1
-        self.last_bettor = gl.message.sender_address
-        self.bets[gl.message.sender_address] = BetRecord(
-            outcome=outcome, amount=0, bettor=gl.message.sender_address
-        )
+        return self.owner.as_hex
 
     @gl.public.view
-    def get_bet_count(self) -> int:
-        return self.bet_count
+    def get_contract_summary(self) -> str:
+        return self.platform_name + ": " + self.platform_description
+
+    @gl.public.write
+    def update_platform_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update description"
+        assert len(new_description) > 0, "Description cannot be empty"
+        self.platform_description = new_description
+
+    @gl.public.write
+    def create_market(self, question: str, outcome_a: str, outcome_b: str, min_stake: u256) -> str:
+        assert len(question) > 0, "Question cannot be empty"
+        assert len(outcome_a) > 0, "Outcome A cannot be empty"
+        assert len(outcome_b) > 0, "Outcome B cannot be empty"
+        assert outcome_a != outcome_b, "Outcomes must be different"
+        assert min_stake > u256(0), "Minimum stake must be greater than zero"
+
+        market_id = str(self.market_count)
+
+        self.market_creators[market_id] = gl.message.sender_address
+        self.market_questions[market_id] = question
+        self.market_outcome_a[market_id] = outcome_a
+        self.market_outcome_b[market_id] = outcome_b
+        self.market_min_stakes[market_id] = min_stake
+        self.market_statuses[market_id] = "active"
+
+        self.market_count += u256(1)
+        self.market_ids.append(market_id)
+
+        return market_id
 
     @gl.public.view
-    def get_bet(self, bettor: Address) -> str:
-        record = self.bets.get(bettor, None)
-        if record is None:
-            return "NO_BET"
-        return record.outcome
-
-    @gl.public.write
-    def cancel(self) -> None:
-        if gl.message.sender_address != self.owner:
-            raise gl.vm.UserError("unauthorized")
-        if not self.is_open:
-            raise gl.vm.UserError("already cancelled")
-        self.is_open = False
-
-    def _safe_text(self, text: str) -> str:
-        return text.replace("\\n", " ").replace("[", "").replace("]", "")
-
-    @gl.public.write
-    def resolve(self) -> None:
-        data = gl.nondet.web.get(self.news_source)
-        safe_q = self._safe_text(self.question)
-        prompt = (
-            f"Context: {data[:1500]}\\n\\n"
-            f"[MARKET QUESTION: {safe_q}]\\n"
-            'Respond with JSON: {"verdict": "YES or NO", "confidence": 0-100}'
-        )
-        result = gl.nondet.exec_prompt(prompt, response_format="json")
-        if int(result["confidence"]) < 70:
-            raise gl.vm.UserError("confidence too low — try again")
-        self.resolution = result["verdict"]
-        self.confidence = int(result["confidence"])
+    def get_market_json(self, market_id: str) -> str:
+        assert market_id in self.market_questions, "Market not found"
+        return json.dumps({
+            "id": market_id,
+            "creator": self.market_creators[market_id].as_hex,
+            "question": self.market_questions[market_id],
+            "outcome_a": self.market_outcome_a[market_id],
+            "outcome_b": self.market_outcome_b[market_id],
+            "min_stake": str(self.market_min_stakes[market_id]),
+            "status": self.market_statuses[market_id],
+        }, sort_keys=True)
 `,
-  task: "Implement `transfer_ownership()` so only the current owner can set `self.owner` to a new `Address`, rejecting zero-address transfers with a `UserError`.",
+  task: "Add `get_active_markets_json(self) -> str` that loops over `self.market_ids`, filters for markets with status `\"active\"`, appends each as a dict to a result list, and returns `json.dumps(result, sort_keys=True)`.",
   hints: [
-    "Check caller first: `if gl.message.sender_address != self.owner: raise gl.vm.UserError(\"unauthorized\")`",
-    "Then check the target address: compare `new_owner == Address(\"0x0000000000000000000000000000000000000000\")`",
-    "After both guards pass, simply assign: `self.owner = new_owner`",
+    "Start with `result = []` then `for market_id in self.market_ids:`.",
+    "Filter: `if self.market_statuses[market_id] == \"active\":`",
+    "End with `return json.dumps(result, sort_keys=True)`.",
   ],
 };
 

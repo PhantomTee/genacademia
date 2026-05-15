@@ -3,76 +3,71 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 5,
   projectPath: "PREDICTION_MARKET",
-  explanation: `## Lesson 5 — CAPSTONE: PredictX Identity Contract
+  explanation: `## Lesson 5 — CAPSTONE: Complete Identity Contract
 
-This capstone consolidates everything from Lessons 1–4 into a cohesive, deployable contract. PredictX now has an owner, a unique market ID, typed state, input validation, and an access-controlled \`cancel()\` method.
+This is the first major milestone. You combine everything from Lessons 1–4 into a complete PredictX identity contract: owner tracking, platform metadata, read-only views, and owner-only write access.
 
-The \`cancel()\` method introduces two checks that will appear throughout PredictX:
+### What you have built so far
 
-1. **Ownership check** — only the deployer can cancel.
-2. **State check** — you cannot cancel an already-cancelled market.
+| Element | Lesson |
+|---|---|
+| SDK header + \`from genlayer import *\` | 1 |
+| \`owner: Address\` stored at deploy time | 2 |
+| \`platform_name\` and \`platform_description\` fields | 2 |
+| \`@gl.public.view\` methods to expose state | 3 |
+| \`@gl.public.write\` with access control + input validation | 4 |
+
+### The new addition: \`get_contract_summary()\`
+
+The only new method this lesson asks you to add is a convenience view that joins the platform name and description into a single readable string. Frontends use this pattern to render a one-line summary without making two separate calls:
 
 \`\`\`python
-@gl.public.write
-def cancel(self) -> None:
-    if gl.message.sender_address != self.owner:
-        raise gl.vm.UserError("unauthorized")
-    if not self.is_open:
-        raise gl.vm.UserError("already cancelled")
-    self.is_open = False
+@gl.public.view
+def get_contract_summary(self) -> str:
+    return self.platform_name + ": " + self.platform_description
 \`\`\`
 
-\`Address\` types support \`==\` and \`!=\` directly — no need to convert to strings for comparison. Always compare addresses this way inside write methods; string comparison would be both slower and error-prone.
+### What comes next
 
-After this lesson you have a solid foundation: a typed, validated, owner-gated contract that you'll extend with AI resolution, betting pools, and payouts in the lessons ahead.`,
+After this lesson the identity layer of PredictX is complete. The next group of lessons builds market storage on top of it — using \`TreeMap\` to store multiple prediction markets inside one contract.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address, u256
+
+from genlayer import *
 
 
-class PredictionMarket(gl.Contract):
-    question: str
-    bet_count: int
-    last_bettor: Address
+class PredictX(gl.Contract):
     owner: Address
-    market_id: u256
-    is_open: bool
+    platform_name: str
+    platform_description: str
 
-    def __init__(self, question: str, market_id: u256) -> None:
-        self.question = question
-        self.bet_count = 0
+    def __init__(self) -> None:
         self.owner = gl.message.sender_address
-        self.market_id = market_id
-        self.is_open = True
+        self.platform_name = "PredictX"
+        self.platform_description = "A GenLayer prediction market that uses AI-assisted resolution."
 
     @gl.public.view
-    def get_question(self) -> str:
-        return self.question
+    def get_platform_name(self) -> str:
+        return self.platform_name
+
+    @gl.public.view
+    def get_platform_description(self) -> str:
+        return self.platform_description
 
     @gl.public.view
     def get_owner(self) -> str:
-        return str(self.owner)
+        return self.owner.as_hex
 
     @gl.public.write
-    def place_bet(self, outcome: str) -> None:
-        if outcome not in ["YES", "NO"]:
-            raise gl.vm.UserError("outcome must be YES or NO")
-        self.bet_count += 1
-        self.last_bettor = gl.message.sender_address
-
-    @gl.public.view
-    def get_bet_count(self) -> int:
-        return self.bet_count
-
-    @gl.public.write
-    def cancel(self) -> None:
-        pass
+    def update_platform_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update description"
+        assert len(new_description) > 0, "Description cannot be empty"
+        self.platform_description = new_description
 `,
-  task: "Implement `cancel()` so only the owner can set `self.is_open = False`, raising `UserError` for unauthorized callers or if the market is already cancelled.",
+  task: "Add a view method `get_contract_summary(self) -> str` that returns the platform name and description joined by \": \" — for example: \"PredictX: A GenLayer prediction market that uses AI-assisted resolution.\"",
   hints: [
-    "Compare `Address` types with `==`: `gl.message.sender_address != self.owner` is the ownership check.",
-    "Check caller first, then check current state — two separate `if` guards, each raising `gl.vm.UserError`.",
-    "`if gl.message.sender_address != self.owner: raise gl.vm.UserError(\"unauthorized\")` then `if not self.is_open: raise gl.vm.UserError(\"already cancelled\")`",
+    "Use `@gl.public.view` and return type `str`.",
+    "Concatenate with Python's `+` operator: `self.platform_name + \": \" + self.platform_description`.",
+    "No imports needed — this is plain string concatenation.",
   ],
 };
 
