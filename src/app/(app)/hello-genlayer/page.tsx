@@ -159,16 +159,17 @@ export default function HelloGenLayerPage() {
             </p>
             <p>
               These are called <strong className="text-ink dark:text-cream-200">Intelligent Contracts</strong>.
-              They're written in Python using a special runtime called <code className="text-xs bg-ink/5 dark:bg-cream-200/5 px-1 py-0.5">genlayer</code>.
+              They are written in Python using a special runtime called{" "}
+              <code className="text-xs bg-ink/5 dark:bg-cream-200/5 px-1 py-0.5">genlayer</code>.
             </p>
           </div>
 
           <div className="border border-ink/20 dark:border-cream-200/20 p-4 space-y-3">
             <div className="text-[10px] font-bold uppercase tracking-widest text-ink/40 dark:text-cream-200/40">
-              What you'll build in this course
+              What you will build in this course
             </div>
             <div className="space-y-2 text-sm text-ink/70 dark:text-cream-200/70">
-              <p>You'll pick one of five intelligent contract tracks and build it across 30 lessons:</p>
+              <p>Pick one of five intelligent contract tracks and build it across 30 lessons:</p>
               <ul className="list-disc list-inside space-y-1">
                 <li>PredictX — AI-resolved prediction markets</li>
                 <li>TrustLance — freelance escrow with AI arbitration</li>
@@ -184,8 +185,9 @@ export default function HelloGenLayerPage() {
               Before you start
             </div>
             <p className="text-sm text-ink/70 dark:text-cream-200/70">
-              Make sure your wallet is connected to <strong className="text-ink dark:text-cream-200">Studionet</strong> —
-              GenLayer's hosted test network. You'll deploy your first contract in the next step.
+              Make sure your wallet is connected to{" "}
+              <strong className="text-ink dark:text-cream-200">Studionet</strong> —
+              GenLayer&apos;s hosted test network. You will deploy your first contract in the next step.
             </p>
           </div>
 
@@ -193,7 +195,7 @@ export default function HelloGenLayerPage() {
             onClick={() => setStep(2)}
             className="w-full py-3 text-sm font-bold uppercase tracking-widest border border-ink dark:border-cream-200 bg-ink dark:bg-cream-200 text-cream-200 dark:text-ink hover:opacity-80 transition-opacity"
           >
-            Let's go →
+            Let&apos;s go →
           </button>
         </div>
       )}
@@ -209,12 +211,13 @@ export default function HelloGenLayerPage() {
 
           <div className="space-y-3 text-sm text-ink/80 dark:text-cream-200/80 leading-relaxed">
             <p>
-              Every GenLayer contract is a Python class that extends <code className="text-xs bg-ink/5 dark:bg-cream-200/5 px-1 py-0.5">gl.Contract</code>.
+              Every GenLayer contract is a Python class that extends{" "}
+              <code className="text-xs bg-ink/5 dark:bg-cream-200/5 px-1 py-0.5">gl.Contract</code>.
               Fields declared at class level become persistent on-chain storage.
             </p>
             <p>
               The <code className="text-xs bg-ink/5 dark:bg-cream-200/5 px-1 py-0.5">@gl.public.view</code> decorator
-              marks read-only methods — they don't cost gas and don't modify state.
+              marks read-only methods — they do not cost gas and do not modify state.
             </p>
           </div>
 
@@ -250,8 +253,12 @@ export default function HelloGenLayerPage() {
             </div>
             <ul className="list-disc list-inside text-sm text-ink/70 dark:text-cream-200/70 space-y-1">
               <li>Stores a greeting string on-chain when deployed</li>
-              <li>Exposes <code className="text-xs bg-ink/5 dark:bg-cream-200/5 px-1 py-0.5">get_greeting()</code> so anyone can read it</li>
-              <li>You'll deploy it to Studionet in the next step</li>
+              <li>
+                Exposes{" "}
+                <code className="text-xs bg-ink/5 dark:bg-cream-200/5 px-1 py-0.5">get_greeting()</code>{" "}
+                so anyone can read it
+              </li>
+              <li>You will deploy it to Studionet in the next step</li>
             </ul>
           </div>
 
@@ -327,7 +334,7 @@ export default function HelloGenLayerPage() {
                 </div>
               </div>
               <p className="text-sm text-ink/70 dark:text-cream-200/70">
-                Your contract is live on Studionet. Now let's call it.
+                Your contract is live on Studionet. Now let&apos;s call it.
               </p>
               <button
                 onClick={() => setStep(4)}
@@ -359,8 +366,8 @@ export default function HelloGenLayerPage() {
           </div>
 
           <p className="text-sm text-ink/80 dark:text-cream-200/80 leading-relaxed">
-            Read methods don't cost gas — they query the contract's current state directly.
-            Let's read the greeting your contract stored when it was deployed.
+            Read methods do not cost gas — they query the contract&apos;s current state directly.
+            Let&apos;s read the greeting your contract stored when it was deployed.
           </p>
 
           <div className="p-4 border border-ink/20 dark:border-cream-200/20 space-y-1 font-mono text-xs">
@@ -405,11 +412,11 @@ export default function HelloGenLayerPage() {
                   Return value
                 </div>
                 <div className="text-lg font-bold text-ink dark:text-cream-200 font-mono">
-                  "{greeting}"
+                  &quot;{greeting}&quot;
                 </div>
               </div>
               <p className="text-sm text-ink/70 dark:text-cream-200/70">
-                That's your contract responding from the blockchain. You just deployed and called your first
+                That&apos;s your contract responding from the blockchain. You just deployed and called your first
                 GenLayer intelligent contract.
               </p>
               <button
@@ -428,14 +435,14 @@ export default function HelloGenLayerPage() {
         <div className="space-y-6">
           <div className="border border-ink/30 dark:border-cream-200/30 px-5 py-4">
             <h1 className="text-xl font-black uppercase tracking-tight text-ink dark:text-cream-200">
-              You're Ready
+              You&apos;re Ready
             </h1>
           </div>
 
           <div className="space-y-3 text-sm text-ink/80 dark:text-cream-200/80 leading-relaxed">
             <p>
-              You've written, deployed, and called your first GenLayer intelligent contract. That's the
-              complete cycle you'll repeat across 30 lessons — each one adding something new to your contract.
+              You&apos;ve written, deployed, and called your first GenLayer intelligent contract. That&apos;s the
+              complete cycle you&apos;ll repeat across 30 lessons — each one adding something new to your contract.
             </p>
             <p>
               Your curriculum is waiting. Pick up where you left off — each lesson builds directly on
