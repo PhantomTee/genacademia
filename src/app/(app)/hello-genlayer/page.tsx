@@ -78,19 +78,18 @@ export default function HelloGenLayerPage() {
   }
 
   async function handleCall() {
-    if (!glClient || !contractAddress) return;
+    if (!contractAddress) return;
     setCallState("calling");
     setCallError("");
     try {
-      const client = glClient as unknown as {
-        readContract: (o: { address: string; functionName: string; args: unknown[] }) => Promise<unknown>;
-      };
-      const result = await client.readContract({
-        address: contractAddress,
-        functionName: "get_greeting",
-        args: [],
+      const res = await fetch("/api/hello/call", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contractAddress }),
       });
-      setGreeting(String(result));
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setGreeting(String(data.result));
       setCallState("success");
     } catch (err) {
       setCallState("error");
@@ -377,7 +376,7 @@ export default function HelloGenLayerPage() {
             <div className="text-ink dark:text-cream-200">get_greeting()</div>
           </div>
 
-          {callState === "idle" && (
+          {callState === "idle" && contractAddress && (
             <button
               onClick={handleCall}
               className="w-full py-3 text-sm font-bold uppercase tracking-widest border border-ink dark:border-cream-200 bg-ink dark:bg-cream-200 text-cream-200 dark:text-ink hover:opacity-80 transition-opacity"
