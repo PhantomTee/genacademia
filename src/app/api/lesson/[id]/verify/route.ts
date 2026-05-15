@@ -5,7 +5,6 @@ import { prisma } from "@/lib/db";
 import { runVerification, runStaticVerification } from "@/lib/genlayer/verify";
 import { getSpec } from "@/lib/curriculum/specs";
 import type { ProjectPath } from "@/lib/curriculum/metadata";
-import type { NetworkTarget } from "@/lib/genlayer/constants";
 
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 
@@ -49,7 +48,6 @@ export async function POST(
   const body = await req.json();
   const { contractAddress, code } = body as { contractAddress?: string; code?: string };
   const projectPath = session.user.projectPath as ProjectPath;
-  const network = session.user.networkTarget as NetworkTarget;
 
   const spec = await getSpec(lessonId, projectPath);
   if (!spec) {
@@ -66,7 +64,7 @@ export async function POST(
   let rpcResult: Awaited<ReturnType<typeof runVerification>> | undefined;
   if (contractAddress) {
     try {
-      rpcResult = await runVerification(contractAddress, spec, network);
+      rpcResult = await runVerification(contractAddress, spec);
     } catch {
       // RPC unavailable — static check is sufficient fallback
     }

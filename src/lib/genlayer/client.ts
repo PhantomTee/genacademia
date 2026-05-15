@@ -1,8 +1,6 @@
 import { createClient } from "genlayer-js";
-import { studionet, localnet } from "./chains";
-import type { NetworkTarget } from "./constants";
+import { studionet } from "./chains";
 
-export function getGenLayerClient(network: NetworkTarget) {
-  const chain = network === "studionet" ? studionet : localnet;
-  return createClient({ chain });
+export function getGenLayerClient() {
+  return createClient({ chain: studionet });
 }

@@ -14,16 +14,3 @@ export const studionetChain = defineChain({
     },
   },
 });
-
-export const localnetChain = defineChain({
-  id: 61127,
-  name: "GenLayer Localnet",
-  nativeCurrency: { name: "GEN", symbol: "GEN", decimals: 18 },
-  rpcUrls: {
-    default: {
-      http: [
-        process.env.NEXT_PUBLIC_LOCALNET_RPC ?? "http://localhost:4000/api",
-      ],
-    },
-  },
-});

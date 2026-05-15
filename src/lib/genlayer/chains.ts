@@ -1,1 +1,1 @@
-export { studionet, localnet } from "genlayer-js/chains";
+export { studionet } from "genlayer-js/chains";

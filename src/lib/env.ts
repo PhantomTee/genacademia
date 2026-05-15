@@ -18,6 +18,4 @@ export const env = {
   NEXTAUTH_URL: process.env.NEXTAUTH_URL!,
   STUDIONET_RPC:
     process.env.NEXT_PUBLIC_STUDIONET_RPC ?? "https://studio.genlayer.com/api",
-  LOCALNET_RPC:
-    process.env.NEXT_PUBLIC_LOCALNET_RPC ?? "http://localhost:4000/api",
 } as const;

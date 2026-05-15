@@ -2,14 +2,13 @@
 
 import { createConfig, http } from "wagmi";
 import { injected } from "wagmi/connectors";
-import { studionetChain, localnetChain } from "./chains";
+import { studionetChain } from "./chains";
 
 export const wagmiConfig = createConfig({
-  chains: [studionetChain, localnetChain],
-  connectors: [injected({ target: "metaMask" })],
+  chains: [studionetChain],
+  connectors: [injected()],
   transports: {
     [studionetChain.id]: http(),
-    [localnetChain.id]: http(),
   },
   ssr: true,
 });

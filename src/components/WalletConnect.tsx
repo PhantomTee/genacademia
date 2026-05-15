@@ -4,7 +4,7 @@ import { useAccount, useConnect, useDisconnect, useConnectors, useSwitchChain } 
 import { useSession, signOut } from "next-auth/react";
 import { useSiweAuth } from "@/hooks/useSiweAuth";
 import { useRouter } from "next/navigation";
-import { studionetChain, localnetChain } from "@/lib/wagmi/chains";
+import { studionetChain } from "@/lib/wagmi/chains";
 
 const btnBase =
   "px-4 py-2 text-xs font-bold uppercase tracking-widest border transition-all -ml-px";
@@ -15,7 +15,7 @@ const btnOutline =
   btnBase +
   " border-ink/20 dark:border-cream-200/20 hover:border-ink dark:hover:border-cream-200 text-ink dark:text-cream-200";
 
-const ALLOWED_CHAINS: number[] = [studionetChain.id, localnetChain.id];
+const ALLOWED_CHAINS: number[] = [studionetChain.id];
 
 export function WalletConnect() {
   const { address, isConnected, chainId } = useAccount();

@@ -1,13 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { NextResponse } from "next/server";
 import { NETWORK_CONFIG } from "@/lib/genlayer/constants";
 
-export async function GET(_req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  const network =
-    (session?.user?.networkTarget as "studionet" | "localnet") ?? "studionet";
-  const config = NETWORK_CONFIG[network];
+export async function GET() {
+  const config = NETWORK_CONFIG.studionet;
 
   try {
     const res = await fetch(config.rpcUrl, {
@@ -21,8 +16,8 @@ export async function GET(_req: NextRequest) {
       }),
       signal: AbortSignal.timeout(3000),
     });
-    return NextResponse.json({ ok: res.ok, network });
+    return NextResponse.json({ ok: res.ok, network: "studionet" });
   } catch {
-    return NextResponse.json({ ok: false, network });
+    return NextResponse.json({ ok: false, network: "studionet" });
   }
 }

@@ -1,5 +1,4 @@
 import { getGenLayerClient } from "./client";
-import type { NetworkTarget } from "./constants";
 
 export interface StaticChecks {
   requiredClass?: string;
@@ -66,10 +65,9 @@ export function runStaticVerification(
 
 export async function runVerification(
   contractAddress: string,
-  spec: VerificationSpec,
-  network: NetworkTarget = "studionet"
+  spec: VerificationSpec
 ): Promise<VerificationResult> {
-  const client = getGenLayerClient(network);
+  const client = getGenLayerClient();
 
   let actual: unknown;
   try {

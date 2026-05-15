@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useSession } from "next-auth/react";
 import { useGenLayerClient } from "@/lib/wagmi/useGenLayerClient";
 
 type DeployState = "idle" | "deploying" | "polling" | "success" | "error";
@@ -21,9 +20,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export function DeployPanel({ lessonId, code, onDeployed }: Props) {
-  const { data: session } = useSession();
-  const network = (session?.user?.networkTarget as "studionet" | "localnet") ?? "studionet";
-  const glClient = useGenLayerClient(network);
+  const glClient = useGenLayerClient();
 
   const [state, setState] = useState<DeployState>("idle");
   const [txHash, setTxHash] = useState("");
@@ -72,7 +69,7 @@ export function DeployPanel({ lessonId, code, onDeployed }: Props) {
           Network
         </span>
         <span className="text-[10px] uppercase tracking-widest text-ink dark:text-cream-200">
-          {network}
+          Studionet
         </span>
       </div>
 

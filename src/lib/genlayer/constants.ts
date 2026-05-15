@@ -3,7 +3,7 @@ export const SDK_DEPENDENCY_HASH =
 
 export const SDK_DEPENDENCY_HEADER = `# { "Depends": "py-genlayer:${SDK_DEPENDENCY_HASH}" }`;
 
-export type NetworkTarget = "studionet" | "localnet";
+export type NetworkTarget = "studionet";
 
 export const NETWORK_CONFIG = {
   studionet: {
@@ -11,11 +11,5 @@ export const NETWORK_CONFIG = {
     chainId: 61999,
     name: "Studionet",
     explorer: "https://explorer-studio.genlayer.com",
-  },
-  localnet: {
-    rpcUrl: process.env.NEXT_PUBLIC_LOCALNET_RPC ?? "http://localhost:4000/api",
-    chainId: 61127,
-    name: "Localnet",
-    explorer: "http://localhost:8080",
   },
 } as const;

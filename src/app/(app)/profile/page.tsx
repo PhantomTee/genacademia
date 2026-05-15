@@ -24,7 +24,7 @@ export default async function ProfilePage() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.walletAddress) redirect("/");
 
-  const { walletAddress, projectPath, experienceLevel, networkTarget } =
+  const { walletAddress, projectPath, experienceLevel } =
     session.user;
 
   const user = await prisma.user.findUnique({
@@ -89,11 +89,9 @@ export default async function ProfilePage() {
           <div className="flex items-center justify-between p-4 bg-gray-900 rounded-xl border border-gray-800">
             <div>
               <div className="text-sm font-medium text-white">Network</div>
-              <div className="text-xs text-gray-400 mt-0.5">
-                {networkTarget === "localnet" ? "Localnet" : "Studionet"}
-              </div>
+              <div className="text-xs text-gray-400 mt-0.5">GenLayer Studionet</div>
             </div>
-            <NetworkSwitcher current={networkTarget ?? "studionet"} />
+            <NetworkSwitcher />
           </div>
         </div>
       </section>
