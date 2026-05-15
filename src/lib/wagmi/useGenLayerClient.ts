@@ -1,17 +1,39 @@
 "use client";
 
-import { useConnectorClient } from "wagmi";
+import { useEffect, useState } from "react";
+import { useAccount } from "wagmi";
 import { createClient } from "genlayer-js";
 import { studionet } from "genlayer-js/chains";
 
-export function useGenLayerClient() {
-  const { data: connectorClient } = useConnectorClient();
+type EIP1193Provider = { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> };
+type GenLayerClient = ReturnType<typeof createClient>;
 
-  if (!connectorClient) return null;
+export function useGenLayerClient(): GenLayerClient | null {
+  const { address, connector } = useAccount();
+  const [client, setClient] = useState<GenLayerClient | null>(null);
 
-  return createClient({
-    chain: studionet,
-    account: connectorClient.account,
-    provider: connectorClient,
-  });
+  useEffect(() => {
+    if (!address || !connector) {
+      setClient(null);
+      return;
+    }
+
+    connector.getProvider().then((rawProvider) => {
+      if (!rawProvider) {
+        setClient(null);
+        return;
+      }
+      setClient(
+        createClient({
+          chain: studionet,
+          // account must be the address string so genlayer-js routes
+          // eth_sendTransaction through the wallet provider, not locally
+          account: address,
+          provider: rawProvider as EIP1193Provider,
+        })
+      );
+    });
+  }, [address, connector]);
+
+  return client;
 }
