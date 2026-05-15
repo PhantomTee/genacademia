@@ -1,7 +1,9 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import type { OnMount } from "@monaco-editor/react";
+import { registerGenLayerPlugin } from "@/lib/monaco/genlayer-plugin";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
@@ -18,6 +20,12 @@ interface Props {
 
 export function CodeEditor({ value, onChange, starterCode }: Props) {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const cleanupRef = useRef<(() => void) | null>(null);
+
+  const handleMount: OnMount = (editor, monaco) => {
+    cleanupRef.current?.();
+    cleanupRef.current = registerGenLayerPlugin(monaco, editor);
+  };
 
   function handleReset() {
     if (showResetConfirm) {
@@ -47,6 +55,7 @@ export function CodeEditor({ value, onChange, starterCode }: Props) {
           theme="vs-dark"
           value={value}
           onChange={(v) => onChange(v ?? "")}
+          onMount={handleMount}
           options={{
             fontSize: 14,
             fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
