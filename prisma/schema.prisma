@@ -1,0 +1,73 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ExperienceLevel {
+  BEGINNER
+  DEVELOPER
+  WEB3
+}
+
+enum ProjectPath {
+  PREDICTION_MARKET
+  FREELANCE_ESCROW
+  DAO
+  DEVELOPER_REPUTATION
+  INSURANCE
+}
+
+model User {
+  id              String           @id @default(cuid())
+  walletAddress   String           @unique
+  experienceLevel ExperienceLevel?
+  projectPath     ProjectPath?
+  networkTarget   String           @default("studionet")
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  nonces          AuthNonce[]
+  progress        Progress[]
+  badges          Badge[]
+}
+
+model AuthNonce {
+  id        String    @id @default(cuid())
+  userId    String?
+  address   String
+  nonce     String    @unique
+  usedAt    DateTime?
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  user      User?     @relation(fields: [userId], references: [id])
+}
+
+model Progress {
+  id              String    @id @default(cuid())
+  userId          String
+  lessonId        Int
+  projectPath     String
+  completed       Boolean   @default(false)
+  contractAddress String?
+  txHash          String?
+  completedAt     DateTime?
+  hintsRevealed   Int[]     @default([])
+  editorDraft     String?
+  draftSavedAt    DateTime?
+  user            User      @relation(fields: [userId], references: [id])
+
+  @@unique([userId, lessonId, projectPath])
+}
+
+model Badge {
+  id          String   @id @default(cuid())
+  userId      String
+  groupId     Int
+  projectPath String
+  earnedAt    DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, groupId, projectPath])
+}
