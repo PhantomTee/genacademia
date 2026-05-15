@@ -43,8 +43,10 @@ export function DeployPanel({ lessonId, code, onDeployed }: Props) {
       setState("polling");
       setStatusLabel(STATUS_LABELS.PENDING);
 
-      const receipt = await (glClient as unknown as { waitForTransactionReceipt: (o: { hash: string }) => Promise<Record<string, string>> }).waitForTransactionReceipt({ hash });
-      const address = receipt?.contractAddress ?? receipt?.contract_address ?? "";
+      const receipt = await (glClient as unknown as {
+        waitForTransactionReceipt: (o: { hash: string }) => Promise<{ txDataDecoded?: { contractAddress?: string } }>;
+      }).waitForTransactionReceipt({ hash });
+      const address = receipt?.txDataDecoded?.contractAddress ?? "";
       setContractAddress(address);
       setStatusLabel(STATUS_LABELS.FINALIZED);
       setState("success");

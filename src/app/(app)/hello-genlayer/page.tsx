@@ -68,7 +68,8 @@ export default function HelloGenLayerPage() {
       };
       const hash = await client.deployContract({ code: HELLO_CONTRACT, args: [] });
       const receipt = await client.waitForTransactionReceipt({ hash });
-      const addr = receipt?.contractAddress ?? receipt?.contract_address ?? "";
+      const addr = (receipt as unknown as { txDataDecoded?: { contractAddress?: string } })
+        ?.txDataDecoded?.contractAddress ?? "";
       setContractAddress(addr);
       setDeployState("success");
     } catch (err) {
@@ -376,7 +377,7 @@ export default function HelloGenLayerPage() {
             <div className="text-ink dark:text-cream-200">get_greeting()</div>
           </div>
 
-          {callState === "idle" && contractAddress && (
+          {callState === "idle" && (
             <button
               onClick={handleCall}
               className="w-full py-3 text-sm font-bold uppercase tracking-widest border border-ink dark:border-cream-200 bg-ink dark:bg-cream-200 text-cream-200 dark:text-ink hover:opacity-80 transition-opacity"
