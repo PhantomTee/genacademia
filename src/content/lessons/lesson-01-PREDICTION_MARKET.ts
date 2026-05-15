@@ -50,6 +50,13 @@ class PredictX(gl.Contract):
     def get_project_name(self) -> str:
         return self.project_name
 `,
+  expectedCode: `Calling:
+
+get_project_name()
+should return:
+
+PredictX: AI-Resolved Prediction Market
+`,
   task: `Change the project name from "PredictX" to:
 
 PredictX: AI-Resolved Prediction Market`,

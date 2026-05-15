@@ -22,6 +22,8 @@ from genlayer import *
 
 # Continue building your contract — add the method described in the task
 `,
+  expectedCode: `No callable output yet. The platform checks persistent storage.
+`,
   task: `Add:
 
 case_titles: TreeMap[str, str]

@@ -38,6 +38,22 @@ class CaseWise(gl.Contract):
         self.owner = gl.message.sender_address
         self.court_name = "CaseWise"
 `,
+  expectedCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
+
+from genlayer import *
+
+
+class CaseWise(gl.Contract):
+    owner: Address
+    court_name: str
+    court_rules: str
+
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.court_name = "CaseWise"
+        self.court_rules = "Parties submit cases and evidence for AI-assisted review."
+No callable output yet. The platform checks the state fields and constructor.
+`,
   task: `Add a persistent field:
 
 court_rules: str

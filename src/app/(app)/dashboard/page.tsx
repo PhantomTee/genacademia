@@ -10,6 +10,7 @@ import {
 
 const LESSON_GROUPS = [1, 2, 3, 4, 5, 6] as const;
 import { LessonCard } from "@/components/curriculum/LessonCard";
+import { CertificateButton } from "@/components/curriculum/CertificateButton";
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
@@ -37,11 +38,16 @@ export default async function DashboardPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-10">
-      <div className="mb-10">
-        <h1 className="text-3xl font-black uppercase text-ink dark:text-cream-200">Your Curriculum</h1>
-        <p className="text-ink/50 dark:text-cream-200/50 mt-1 text-sm">
-          {totalComplete} / {LESSONS.length} lessons complete
-        </p>
+      <div className="mb-10 flex items-start justify-between flex-wrap gap-4">
+        <div>
+          <h1 className="text-3xl font-black uppercase text-ink dark:text-cream-200">Your Curriculum</h1>
+          <p className="text-ink/50 dark:text-cream-200/50 mt-1 text-sm">
+            {totalComplete} / {LESSONS.length} lessons complete
+          </p>
+        </div>
+        {totalComplete >= LESSONS.length && (
+          <CertificateButton track={projectPath} />
+        )}
       </div>
 
       <div className="space-y-10">

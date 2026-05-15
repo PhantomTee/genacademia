@@ -14,6 +14,13 @@ from genlayer import *
 
 # Continue building your contract — add the method described in the task
 `,
+  expectedCode: `First case returns:
+
+0
+Second case returns:
+
+1
+`,
   task: `Add:
 
 case_count: u256

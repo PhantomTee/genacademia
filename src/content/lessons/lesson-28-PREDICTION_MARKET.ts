@@ -14,6 +14,21 @@ from genlayer import *
 
 # Continue building your contract — add the method described in the task
 `,
+  expectedCode: `@gl.public.view
+def get_test_checklist_json(self) -> str:
+    return json.dumps([
+        "Create a market with valid outcomes",
+        "Reject a market with duplicate outcomes",
+        "Stake on outcome A",
+        "Stake on outcome B",
+        "Reject staking below minimum",
+        "Close the market",
+        "Resolve the market with AI evidence",
+        "Allow winning users to claim",
+        "Reject duplicate claims"
+    ], sort_keys=True)
+Returns a JSON list of test steps.
+`,
   task: `Add a testing checklist method.`,
   hints: [
     "Add a testing checklist method.",

@@ -14,6 +14,38 @@ from genlayer import *
 
 # Continue building your contract — add the method described in the task
 `,
+  expectedCode: `import json
+from genlayer import *
+Method:
+
+@gl.public.view
+def get_market_json(self, market_id: str) -> str:
+    assert market_id in self.market_questions, "Market not found"
+
+    return json.dumps({
+        "id": market_id,
+        "creator": self.market_creators[market_id].as_hex,
+        "question": self.market_questions[market_id],
+        "outcome_a": self.market_outcome_a[market_id],
+        "outcome_b": self.market_outcome_b[market_id],
+        "min_stake": str(self.market_min_stakes[market_id]),
+        "status": self.market_statuses[market_id],
+    }, sort_keys=True)
+Calling:
+
+get_market_json("0")
+returns a JSON string like:
+
+{
+  "id": "0",
+  "creator": "0x...",
+  "question": "Will GenLayer grow in 2026?",
+  "outcome_a": "Yes",
+  "outcome_b": "No",
+  "min_stake": "100",
+  "status": "active"
+}
+`,
   task: `Add:
 
 import json

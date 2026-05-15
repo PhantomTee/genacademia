@@ -14,6 +14,10 @@ from genlayer import *
 
 # Continue building your contract — add the method described in the task
 `,
+  expectedCode: `If user stakes 100 on A, their stake key stores:
+
+100
+`,
   task: `Add:
 
 user_stakes_a: TreeMap[str, u256]

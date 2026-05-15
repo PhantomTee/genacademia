@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { SuccessModal } from "./SuccessModal";
 
 interface SpecInfo {
@@ -47,9 +47,11 @@ export function VerifyPanel({
       .catch(() => {});
   }, [lessonId]);
 
+  const prevAddressRef = useRef("");
+
   const canVerify = !!contractAddress || !!code;
 
-  async function handleCall() {
+  const handleCall = useCallback(async () => {
     if (!contractAddress) return;
     setCalling(true);
     setCallResult(null);
@@ -67,7 +69,15 @@ export function VerifyPanel({
     } finally {
       setCalling(false);
     }
-  }
+  }, [contractAddress, lessonId]);
+
+  // Auto-call when a new contract address is set (e.g. just after deploy)
+  useEffect(() => {
+    if (contractAddress && !prevAddressRef.current && specInfo) {
+      handleCall();
+    }
+    prevAddressRef.current = contractAddress;
+  }, [contractAddress, specInfo, handleCall]);
 
   async function handleVerify() {
     if (!canVerify) return;

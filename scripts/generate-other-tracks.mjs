@@ -36,14 +36,17 @@ function tsEscape(s) {
     .replace(/`/g, "\\`")
     .replace(/\$\{/g, "\\${");
 }
-function file(lessonId, projectPath, explanation, starterCode, task, h1, h2, h3) {
+function file(lessonId, projectPath, explanation, starterCode, task, h1, h2, h3, expectedCode) {
+  const escapedExpected = expectedCode && expectedCode !== starterCode
+    ? `\n  expectedCode: \`${tsEscape(expectedCode)}\`,`
+    : "";
   return `import type { LessonContent } from "@/types/content";
 
 const content: LessonContent = {
   lessonId: ${lessonId},
   projectPath: "${projectPath}",
   explanation: \`${tsEscape(explanation)}\`,
-  starterCode: \`${tsEscape(starterCode)}\`,
+  starterCode: \`${tsEscape(starterCode)}\`,${escapedExpected}
   task: \`${tsEscape(task)}\`,
   hints: [
     "${dqEscape(h1)}",
@@ -55,10 +58,10 @@ const content: LessonContent = {
 export default content;
 `;
 }
-function write(lessonId, projectPath, explanation, starterCode, task, h1, h2, h3) {
+function write(lessonId, projectPath, explanation, starterCode, task, h1, h2, h3, expectedCode) {
   const nn = String(lessonId).padStart(2, "0");
   const fp = resolve(LESSONS_DIR, `lesson-${nn}-${projectPath}.ts`);
-  writeFileSync(fp, file(lessonId, projectPath, explanation, starterCode, task, h1, h2, h3), "utf8");
+  writeFileSync(fp, file(lessonId, projectPath, explanation, starterCode, task, h1, h2, h3, expectedCode), "utf8");
   console.log(`  ✓ lesson-${nn}-${projectPath}.ts`);
 }
 

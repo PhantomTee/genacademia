@@ -14,6 +14,10 @@ from genlayer import *
 
 # Continue building your contract — add the method described in the task
 `,
+  expectedCode: `After two cases, internal index holds:
+
+["0", "1"]
+`,
   task: `Add:
 
 case_ids: DynArray[str]

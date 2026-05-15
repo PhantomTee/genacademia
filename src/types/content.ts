@@ -12,6 +12,7 @@ export interface LessonContent {
   projectPath: ProjectPath;
   explanation: string;
   starterCode: string;
+  expectedCode?: string;
   task: string;
   hints: [string, string, string];
 }

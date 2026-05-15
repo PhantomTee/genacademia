@@ -36,6 +36,27 @@ class CaseWise(gl.Contract):
     def get_project_name(self) -> str:
         return self.project_name
 `,
+  expectedCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
+
+from genlayer import *
+
+
+class CaseWise(gl.Contract):
+    project_name: str
+
+    def __init__(self) -> None:
+        self.project_name = "CaseWise: AI-Assisted Dispute Resolution"
+
+    @gl.public.view
+    def get_project_name(self) -> str:
+        return self.project_name
+Calling:
+
+get_project_name()
+returns:
+
+CaseWise: AI-Assisted Dispute Resolution
+`,
   task: `Change the project name to:
 
 CaseWise: AI-Assisted Dispute Resolution`,

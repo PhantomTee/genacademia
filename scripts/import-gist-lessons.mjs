@@ -247,6 +247,12 @@ function buildTsFile(lessonId, projectPath, title, sections) {
   const starterCode = extractCode(starterLines) ||
     `# { "Depends": "${REAL_HASH}" }\n\nfrom genlayer import *\n\n# Continue building your contract — add the method described in the task\n`;
 
+  // Expected code: prefer EXPECTED section, fall back to FINAL_CONTRACT
+  const expectedRaw = sections.EXPECTED.length > 0
+    ? extractCode(sections.EXPECTED)
+    : extractCode(sections.FINAL_CONTRACT);
+  const expectedCode = expectedRaw && expectedRaw !== starterCode ? expectedRaw : null;
+
   const explanation = buildExplanation(title, lessonId, sections);
 
   const taskLines = sections.TASK.join("\n").trim();
@@ -256,6 +262,7 @@ function buildTsFile(lessonId, projectPath, title, sections) {
   const escaped = {
     explanation: tsEscape(explanation),
     starterCode: tsEscape(starterCode),
+    expectedCode: expectedCode ? tsEscape(expectedCode) : null,
     task: tsEscape(taskLines),
     h1: sanitizeForDQString(h1),
     h2: sanitizeForDQString(h2),
@@ -268,7 +275,7 @@ const content: LessonContent = {
   lessonId: ${lessonId},
   projectPath: "${projectPath}",
   explanation: \`${escaped.explanation}\`,
-  starterCode: \`${escaped.starterCode}\`,
+  starterCode: \`${escaped.starterCode}\`,${escaped.expectedCode != null ? `\n  expectedCode: \`${escaped.expectedCode}\`,` : ""}
   task: \`${escaped.task}\`,
   hints: [
     "${escaped.h1}",

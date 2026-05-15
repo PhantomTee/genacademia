@@ -14,6 +14,19 @@ from genlayer import *
 
 # Continue building your contract — add the method described in the task
 `,
+  expectedCode: `Invalid call:
+
+create_market("", "Yes", "No", u256(100))
+fails with:
+
+Question cannot be empty
+Invalid call:
+
+create_market("Will it rain?", "Yes", "Yes", u256(100))
+fails with:
+
+Outcomes must be different
+`,
   task: `Add validation for market creation:
 
 Question cannot be empty.

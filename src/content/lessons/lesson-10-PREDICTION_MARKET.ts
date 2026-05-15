@@ -14,6 +14,13 @@ from genlayer import *
 
 # Continue building your contract — add the method described in the task
 `,
+  expectedCode: `First call returns:
+
+0
+Second call returns:
+
+1
+`,
   task: `Add:
 
 market_count: u256

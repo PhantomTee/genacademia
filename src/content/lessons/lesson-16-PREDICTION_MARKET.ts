@@ -14,6 +14,35 @@ from genlayer import *
 
 # Continue building your contract — add the method described in the task
 `,
+  expectedCode: `market_total_a: TreeMap[str, u256]
+market_total_b: TreeMap[str, u256]
+Method:
+
+@gl.public.write.payable
+def stake_on_outcome(self, market_id: str, outcome: str) -> None:
+    assert market_id in self.market_questions, "Market not found"
+    assert self.market_statuses[market_id] == "active", "Market is not active"
+    assert gl.message.value >= self.market_min_stakes[market_id], "Stake is below minimum"
+
+    if market_id not in self.market_total_a:
+        self.market_total_a[market_id] = u256(0)
+
+    if market_id not in self.market_total_b:
+        self.market_total_b[market_id] = u256(0)
+
+    if outcome == "A":
+        self.market_total_a[market_id] += gl.message.value
+    elif outcome == "B":
+        self.market_total_b[market_id] += gl.message.value
+    else:
+        assert False, "Invalid outcome"
+If user stakes on "A" with enough GEN:
+
+market_total_a increases
+Invalid outcome "C" fails:
+
+Invalid outcome
+`,
   task: `Add stake storage:
 
 market_total_a: TreeMap[str, u256]

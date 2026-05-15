@@ -14,6 +14,8 @@ from genlayer import *
 
 # Continue building your contract — add the method described in the task
 `,
+  expectedCode: `The platform does not need one specific method output. It checks that the final contract contains all expected modules.
+`,
   task: `Make sure the contract includes all required components:
 
 Identity

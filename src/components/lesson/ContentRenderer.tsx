@@ -3,14 +3,17 @@
 import ReactMarkdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import "highlight.js/styles/github-dark.css";
+import { DiffView } from "./DiffView";
 
 interface Props {
   explanation: string;
   task: string;
   docUrl: string;
+  starterCode?: string;
+  expectedCode?: string;
 }
 
-export function ContentRenderer({ explanation, task, docUrl }: Props) {
+export function ContentRenderer({ explanation, task, docUrl, starterCode, expectedCode }: Props) {
   return (
     <div className="h-full overflow-y-auto p-6 space-y-6">
       <div className="prose dark:prose-invert prose-sm max-w-none
@@ -39,6 +42,10 @@ export function ContentRenderer({ explanation, task, docUrl }: Props) {
           {task}
         </div>
       </div>
+
+      {starterCode && expectedCode && expectedCode !== starterCode && (
+        <DiffView starterCode={starterCode} expectedCode={expectedCode} />
+      )}
 
       <a
         href={docUrl}

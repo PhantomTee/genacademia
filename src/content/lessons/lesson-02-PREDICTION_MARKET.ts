@@ -37,6 +37,22 @@ class PredictX(gl.Contract):
         self.owner = gl.message.sender_address
         self.platform_name = "PredictX"
 `,
+  expectedCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
+
+from genlayer import *
+
+
+class PredictX(gl.Contract):
+    owner: Address
+    platform_name: str
+    platform_description: str
+
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.platform_name = "PredictX"
+        self.platform_description = "A GenLayer prediction market that uses AI-assisted resolution."
+No method is called yet. The platform checks that state fields exist.
+`,
   task: `Add a second persistent field:
 
 platform_description: str

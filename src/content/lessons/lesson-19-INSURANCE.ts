@@ -16,6 +16,14 @@ from genlayer import *
 
 # Continue building your contract — add the method described in the task
 `,
+  expectedCode: `After manual ruling:
+
+{
+  "status": "ruled",
+  "ruling": "CLAIMANT_WINS",
+  "ruling_reason": "Evidence supports the claimant."
+}
+`,
   task: `Add:
 
 case_rulings: TreeMap[str, str]

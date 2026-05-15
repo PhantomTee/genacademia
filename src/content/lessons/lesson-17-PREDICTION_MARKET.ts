@@ -14,6 +14,11 @@ from genlayer import *
 
 # Continue building your contract — add the method described in the task
 `,
+  expectedCode: `assert gl.message.sender_address != self.market_creators[market_id], "Creator cannot stake on own market"
+If creator tries to stake:
+
+Creator cannot stake on own market
+`,
   task: `Prevent the market creator from staking in their own market.
 
 Add inside stake_on_outcome:

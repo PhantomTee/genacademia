@@ -16,6 +16,23 @@ from genlayer import *
 
 # Continue building your contract — add the method described in the task
 `,
+  expectedCode: `@gl.public.view
+def get_resolution_prompt(self, market_id: str, evidence: str) -> str:
+    assert market_id in self.market_questions, "Market not found"
+
+    return (
+        "Resolve this prediction market using the evidence provided. "
+        + "Question: "
+        + self.market_questions[market_id]
+        + " Outcome A: "
+        + self.market_outcome_a[market_id]
+        + " Outcome B: "
+        + self.market_outcome_b[market_id]
+        + " Evidence: "
+        + evidence
+    )
+Calling with evidence returns a full AI prompt string.
+`,
   task: `Add a method that prepares a resolution prompt.
 
 For now, it returns a prompt string only.`,

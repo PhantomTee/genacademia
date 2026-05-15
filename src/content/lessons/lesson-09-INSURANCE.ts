@@ -21,6 +21,16 @@ from genlayer import *
 
 # Continue building your contract — add the method described in the task
 `,
+  expectedCode: `Empty title fails with:
+
+Title cannot be empty
+Empty claim fails with:
+
+Claim cannot be empty
+Same claimant/respondent fails with:
+
+Claimant and respondent must be different
+`,
   task: `Add validation to submit_case.
 
 Expected method

@@ -14,6 +14,13 @@ from genlayer import *
 
 # Continue building your contract — add the method described in the task
 `,
+  expectedCode: `Calling with u256(100) returns:
+
+0
+Calling with u256(0) fails with:
+
+Minimum stake must be greater than zero
+`,
   task: `Add:
 
 market_min_stakes: TreeMap[str, u256]

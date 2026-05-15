@@ -20,6 +20,27 @@ from genlayer import *
 
 # Continue building your contract — add the method described in the task
 `,
+  expectedCode: `@gl.public.write
+def cancel_case(self, case_id: str) -> None:
+    assert case_id in self.case_titles, "Case not found"
+
+    caller = gl.message.sender_address
+    claimant = self.case_claimants[case_id]
+
+    assert caller == claimant, "Only claimant can cancel case"
+    assert self.case_statuses[case_id] == "submitted", "Only submitted cases can be cancelled"
+
+    self.case_statuses[case_id] = "cancelled"
+Before:
+
+submitted
+After:
+
+cancelled
+Wrong caller fails with:
+
+Only claimant can cancel case
+`,
   task: `Add:
 
 cancel_case(case_id: str)

@@ -21,6 +21,8 @@ from genlayer import *
 
 # Continue building your contract — add the method described in the task
 `,
+  expectedCode: `CLAIMANT_WINS|HIGH|The claimant evidence supports the claim.
+`,
   task: `Update AI review to split output with:
 
 parts = result.split("|")

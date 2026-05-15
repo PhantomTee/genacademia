@@ -16,6 +16,13 @@ from genlayer import *
 
 # Continue building your contract — add the method described in the task
 `,
+  expectedCode: `After payment:
+
+status = reviewing
+Low payment fails with:
+
+Payment is below case fee
+`,
   task: `Add:
 
 case_paid_amounts: TreeMap[str, u256]

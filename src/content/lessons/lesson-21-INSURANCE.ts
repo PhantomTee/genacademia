@@ -24,6 +24,30 @@ from genlayer import *
 
 # Continue building your contract — add the method described in the task
 `,
+  expectedCode: `@gl.public.view
+def get_case_review_prompt(self, case_id: str) -> str:
+    assert case_id in self.case_titles, "Case not found"
+
+    return (
+        "Review this dispute case. "
+        + "Title: "
+        + self.case_titles[case_id]
+        + ". Claim: "
+        + self.case_claims[case_id]
+        + ". Claimant evidence: "
+        + (self.case_claimant_evidence[case_id] if case_id in self.case_claimant_evidence else "")
+        + ". Respondent evidence: "
+        + (self.case_respondent_evidence[case_id] if case_id in self.case_respondent_evidence else "")
+        + ". Recommend a ruling and explain why."
+    )
+Returns a prompt string containing:
+
+title
+claim
+claimant evidence
+respondent evidence
+ruling instruction
+`,
   task: `Add:
 
 get_case_review_prompt(case_id: str) -> str`,

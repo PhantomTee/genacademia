@@ -16,6 +16,13 @@ from genlayer import *
 
 # Continue building your contract — add the method described in the task
 `,
+  expectedCode: `Valid case fee returns:
+
+0
+Zero fee fails with:
+
+Case fee must be greater than zero
+`,
   task: `Add:
 
 case_fees: TreeMap[str, u256]

@@ -14,6 +14,8 @@ from genlayer import *
 
 # Continue building your contract — add the method described in the task
 `,
+  expectedCode: `A|Evidence indicates outcome A happened.
+`,
   task: `Update the prompt so it asks for a stricter format.
 
 Instead of returning only A or B, the AI should return:

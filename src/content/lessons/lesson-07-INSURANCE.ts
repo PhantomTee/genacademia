@@ -19,6 +19,27 @@ from genlayer import *
 
 # Continue building your contract — add the method described in the task
 `,
+  expectedCode: `@gl.public.write
+def submit_case(self, title: str, claim: str, respondent: Address) -> str:
+    case_id = "0"
+
+    self.case_titles[case_id] = title
+    self.case_claims[case_id] = claim
+    self.case_claimants[case_id] = gl.message.sender_address
+    self.case_respondents[case_id] = respondent
+    self.case_statuses[case_id] = "submitted"
+
+    return case_id
+Calling:
+
+submit_case("Payment dispute", "The freelancer did not deliver the agreed work.", respondent)
+returns:
+
+0
+Case status becomes:
+
+submitted
+`,
   task: `Add a first version of:
 
 submit_case(title: str, claim: str, respondent: Address) -> str

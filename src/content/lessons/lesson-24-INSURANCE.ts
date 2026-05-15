@@ -14,6 +14,15 @@ from genlayer import *
 
 # Continue building your contract — add the method described in the task
 `,
+  expectedCode: `After AI review:
+
+{
+  "ai_ruling": "CLAIMANT_WINS",
+  "ai_confidence": "HIGH",
+  "ai_reason": "The claimant evidence supports the claim.",
+  "has_ai_review": true
+}
+`,
   task: `Add:
 
 case_ai_rulings: TreeMap[str, str]

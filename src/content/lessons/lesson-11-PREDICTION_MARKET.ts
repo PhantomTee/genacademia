@@ -14,6 +14,11 @@ from genlayer import *
 
 # Continue building your contract — add the method described in the task
 `,
+  expectedCode: `After creating two markets, market_ids contains:
+
+["0", "1"]
+The contract does not expose this yet. That comes in Lesson 13.
+`,
   task: `Add:
 
 market_ids: DynArray[str]

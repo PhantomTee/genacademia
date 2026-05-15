@@ -16,15 +16,39 @@ interface Props {
   value: string;
   onChange: (value: string) => void;
   starterCode: string;
+  onLintErrorCount?: (count: number) => void;
 }
 
-export function CodeEditor({ value, onChange, starterCode }: Props) {
+export function CodeEditor({ value, onChange, starterCode, onLintErrorCount }: Props) {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const cleanupRef = useRef<(() => void) | null>(null);
+  const onLintRef = useRef(onLintErrorCount);
+  onLintRef.current = onLintErrorCount;
 
   const handleMount: OnMount = (editor, monaco) => {
     cleanupRef.current?.();
     cleanupRef.current = registerGenLayerPlugin(monaco, editor);
+
+    function reportMarkers() {
+      const model = editor.getModel();
+      if (!model) return;
+      const markers = monaco.editor.getModelMarkers({ resource: model.uri });
+      const errors = markers.filter((m: { severity: number }) => m.severity === monaco.MarkerSeverity.Error);
+      onLintRef.current?.(errors.length);
+    }
+
+    // Report after each content change (plugin re-runs linting synchronously)
+    const dispChange = editor.onDidChangeModelContent(() => {
+      setTimeout(reportMarkers, 350);
+    });
+    // Initial report after plugin has run
+    setTimeout(reportMarkers, 600);
+
+    const origCleanup = cleanupRef.current;
+    cleanupRef.current = () => {
+      origCleanup?.();
+      dispChange.dispose();
+    };
   };
 
   function handleReset() {

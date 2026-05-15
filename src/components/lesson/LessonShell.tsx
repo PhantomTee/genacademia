@@ -10,6 +10,7 @@ import { VerifyPanel } from "./VerifyPanel";
 import { HintsPanel } from "./HintsPanel";
 import { CheatsheetPanel } from "./CheatsheetPanel";
 import { NetworkBanner } from "@/components/NetworkBanner";
+import { GroupProgressBar } from "./GroupProgressBar";
 import { useAutoSave } from "@/hooks/useAutoSave";
 import type { LessonContent } from "@/types/content";
 import type { LessonMeta } from "@/lib/curriculum/metadata";
@@ -23,20 +24,40 @@ interface Props {
 
 export function LessonShell({ lesson, content }: Props) {
   useSession();
-  const [code, setCode] = useState(content.starterCode);
+  const storageKey = `draft-${lesson.id}-${content.projectPath}`;
+  const [code, setCode] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(`draft-${lesson.id}-${content.projectPath}`);
+      if (saved && saved !== content.starterCode) return saved;
+    }
+    return content.starterCode;
+  });
   const [activeTab, setActiveTab] = useState<Tab>("deploy");
   const [contractAddress, setContractAddress] = useState("");
   const [hintsRevealed, setHintsRevealed] = useState<number[]>([]);
   const [progressLoaded, setProgressLoaded] = useState(false);
+  const [lintErrors, setLintErrors] = useState(0);
 
   useAutoSave(lesson.id, code);
+
+  // Fast localStorage save (800ms debounce — faster than the 30s API save)
+  useEffect(() => {
+    if (!progressLoaded) return;
+    const timer = setTimeout(() => {
+      localStorage.setItem(storageKey, code);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [code, progressLoaded, storageKey]);
 
   useEffect(() => {
     async function loadProgress() {
       const res = await fetch(`/api/progress/${lesson.id}`);
       const data = await res.json();
       if (data.progress) {
-        if (data.progress.editorDraft) setCode(data.progress.editorDraft);
+        if (data.progress.editorDraft) {
+          setCode(data.progress.editorDraft);
+          localStorage.setItem(storageKey, data.progress.editorDraft);
+        }
         if (data.progress.contractAddress)
           setContractAddress(data.progress.contractAddress);
         if (data.progress.hintsRevealed)
@@ -45,11 +66,11 @@ export function LessonShell({ lesson, content }: Props) {
       setProgressLoaded(true);
     }
     loadProgress();
-  }, [lesson.id]);
+  }, [lesson.id, storageKey]);
 
-  const TABS: { id: Tab; label: string }[] = [
+  const TABS: { id: Tab; label: string; badge?: number }[] = [
     { id: "deploy", label: "Deploy" },
-    { id: "verify", label: "Verify" },
+    { id: "verify", label: "Verify", badge: lintErrors || undefined },
     { id: "hints", label: "Hints" },
     { id: "cheatsheet", label: "Cheat Sheet" },
   ];
@@ -57,6 +78,7 @@ export function LessonShell({ lesson, content }: Props) {
   return (
     <div className="flex flex-col h-[calc(100vh-3.5rem)]">
       <NetworkBanner />
+      <GroupProgressBar groupId={lesson.groupId} projectPath={content.projectPath} />
 
       {/* Desktop: resizable 3-panel layout */}
       <div className="hidden md:flex flex-1 min-h-0">
@@ -67,6 +89,8 @@ export function LessonShell({ lesson, content }: Props) {
               explanation={content.explanation}
               task={content.task}
               docUrl={lesson.docUrl}
+              starterCode={content.starterCode}
+              expectedCode={content.expectedCode}
             />
           </Panel>
 
@@ -84,6 +108,7 @@ export function LessonShell({ lesson, content }: Props) {
                     value={code}
                     onChange={setCode}
                     starterCode={content.starterCode}
+                    onLintErrorCount={setLintErrors}
                   />
                 )}
               </Panel>
@@ -99,13 +124,18 @@ export function LessonShell({ lesson, content }: Props) {
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`px-4 py-2 text-sm font-medium transition-colors ${
+                      className={`relative px-4 py-2 text-sm font-medium transition-colors ${
                         activeTab === tab.id
                           ? "text-ink dark:text-cream-200 border-b-2 border-ink dark:border-cream-200 bg-ink/5 dark:bg-cream-200/5"
                           : "text-ink/40 dark:text-cream-200/40 hover:text-ink dark:hover:text-cream-200"
                       }`}
                     >
                       {tab.label}
+                      {tab.badge ? (
+                        <span className="ml-1.5 inline-flex items-center justify-center text-[10px] font-bold bg-red-500 text-white rounded-full w-4 h-4">
+                          {tab.badge}
+                        </span>
+                      ) : null}
                     </button>
                   ))}
                 </div>
@@ -163,6 +193,7 @@ export function LessonShell({ lesson, content }: Props) {
               value={code}
               onChange={setCode}
               starterCode={content.starterCode}
+              onLintErrorCount={setLintErrors}
             />
           )}
         </div>
@@ -171,11 +202,16 @@ export function LessonShell({ lesson, content }: Props) {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 py-2 text-xs font-medium ${
+              className={`relative flex-1 py-2 text-xs font-medium ${
                 activeTab === tab.id ? "text-white bg-ink/5 dark:bg-cream-200/5" : "text-gray-500"
               }`}
             >
               {tab.label}
+              {tab.badge ? (
+                <span className="ml-1 inline-flex items-center justify-center text-[9px] font-bold bg-red-500 text-white rounded-full w-3.5 h-3.5">
+                  {tab.badge}
+                </span>
+              ) : null}
             </button>
           ))}
         </div>

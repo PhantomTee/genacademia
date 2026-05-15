@@ -22,6 +22,14 @@ from genlayer import *
 
 # Continue building your contract — add the method described in the task
 `,
+  expectedCode: `Claimant evidence is stored when claimant calls.
+
+Respondent evidence is stored when respondent calls.
+
+Wrong caller fails with:
+
+Only case parties can add evidence
+`,
   task: `Add:
 
 case_claimant_evidence: TreeMap[str, str]

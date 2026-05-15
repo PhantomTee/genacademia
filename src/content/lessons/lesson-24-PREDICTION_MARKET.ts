@@ -14,6 +14,13 @@ from genlayer import *
 
 # Continue building your contract — add the method described in the task
 `,
+  expectedCode: `After AI resolution:
+
+{
+  "winning_outcome": "A",
+  "resolution_reason": "Evidence indicates outcome A happened."
+}
+`,
   task: `Add:
 
 market_resolution_reason: TreeMap[str, str]

@@ -21,6 +21,8 @@ market_statuses: TreeMap[str, str]
 A TreeMap stores many records by key. In PredictX, every market gets an ID like "0", "1", or "2", and each map stores one part of the market.`,
   starterCode: `Use the Lesson 5 code.
 `,
+  expectedCode: `No public output yet. The platform checks storage declarations.
+`,
   task: `Add these persistent fields:
 
 market_questions: TreeMap[str, str]

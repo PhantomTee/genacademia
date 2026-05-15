@@ -14,6 +14,15 @@ from genlayer import *
 
 # Continue building your contract — add the method described in the task
 `,
+  expectedCode: `After evidence is added:
+
+{
+  "paid_amount": "100",
+  "claimant_evidence": "ipfs://claimant-evidence",
+  "respondent_evidence": "ipfs://respondent-evidence",
+  "status": "reviewing"
+}
+`,
   task: `Update get_case_json to include:
 
 paid_amount

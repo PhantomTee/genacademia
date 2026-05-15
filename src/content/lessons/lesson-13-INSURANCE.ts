@@ -14,6 +14,27 @@ from genlayer import *
 
 # Continue building your contract — add the method described in the task
 `,
+  expectedCode: `@gl.public.view
+def get_open_cases_json(self) -> str:
+    result = []
+
+    for case_id in self.case_ids:
+        status = self.case_statuses[case_id]
+
+        if status != "closed" and status != "cancelled":
+            result.append({
+                "id": case_id,
+                "title": self.case_titles[case_id],
+                "claim": self.case_claims[case_id],
+                "claimant": self.case_claimants[case_id].as_hex,
+                "respondent": self.case_respondents[case_id].as_hex,
+                "case_fee": str(self.case_fees[case_id]),
+                "status": status,
+            })
+
+    return json.dumps(result, sort_keys=True)
+Returns a JSON array of active/open cases.
+`,
   task: `Add:
 
 get_open_cases_json()

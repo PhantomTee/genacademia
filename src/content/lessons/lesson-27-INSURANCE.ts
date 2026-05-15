@@ -16,6 +16,16 @@ from genlayer import *
 
 # Continue building your contract — add the method described in the task
 `,
+  expectedCode: `After appeal:
+
+{
+  "status": "appealed",
+  "appeal_reason": "The ruling ignored my submitted evidence."
+}
+Wrong caller fails with:
+
+Only case parties can appeal
+`,
   task: `Add:
 
 case_appeal_reasons: TreeMap[str, str]

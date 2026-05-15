@@ -14,6 +14,19 @@ from genlayer import *
 
 # Continue building your contract — add the method described in the task
 `,
+  expectedCode: `@gl.public.view
+def get_frontend_actions_json(self) -> str:
+    return json.dumps({
+        "create": "create_market(question, outcome_a, outcome_b, min_stake)",
+        "list": "get_active_markets_json()",
+        "detail": "get_market_json(market_id)",
+        "stake": "stake_on_outcome(market_id, outcome)",
+        "close": "close_market(market_id)",
+        "resolve": "resolve_with_ai(market_id, evidence)",
+        "claim": "claim_winnings(market_id)",
+    }, sort_keys=True)
+Returns JSON explaining frontend method mappings.
+`,
   task: `Add a method that exposes frontend actions as JSON.`,
   hints: [
     "Add a method that exposes frontend actions as JSON.",

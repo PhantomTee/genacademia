@@ -14,6 +14,11 @@ from genlayer import *
 
 # Continue building your contract — add the method described in the task
 `,
+  expectedCode: `assert market_id not in self.market_winning_outcome, "Market already resolved"
+Trying to resolve again fails:
+
+Market already resolved
+`,
   task: `Add guard inside resolve_with_ai:
 
 assert market_id not in self.market_winning_outcome, "Market already resolved"`,
