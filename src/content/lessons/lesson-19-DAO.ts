@@ -3,95 +3,144 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 19,
   projectPath: "DAO",
-  explanation: `## Lesson 19 — Multi-Modal AI: Images in exec_prompt
+  explanation: `## Lesson 19 — Proposal Execution
 
-In Lesson 18 you captured a screenshot with \`web.render\`. Now you pass that image directly to the LLM using \`exec_prompt\`'s \`images\` parameter — enabling **multi-modal AI evaluation** where the LLM reasons about both text and visuals.
-
-### exec_prompt with Images
-
-\`exec_prompt\` accepts an optional \`images\` parameter: a list of \`bytes\` objects. The LLM receives the image(s) alongside the text prompt and can describe, analyse, or reason about what it sees.
-
-\`\`\`python
-screenshot: bytes = gl.nondet.web.render(url)
-verdict: str = gl.nondet.exec_prompt(
-    "Does this screenshot look like a legitimate open-source project? Answer YES or NO.",
-    images=[screenshot]
-)
-\`\`\`
-
-### visual_assess_proposal
-
-This lesson adds \`visual_assess_proposal(pid, screenshot_url)\`:
-
-1. Look up the proposal by \`pid\` (to get its title for context)
-2. Render the screenshot URL
-3. Ask the LLM if the page looks like a legitimate proposal
-
-This gives the DAO a lightweight visual sanity-check: spam proposals or placeholder pages are likely to fail the visual test even if their text description sounds reasonable.
-
-### Combining Text and Image Context
-
-For the best results, your prompt should include both text context and the image:
-
-\`\`\`python
-prompt = f"Evaluate: does this screenshot represent a legitimate project proposal for '{title}'? Answer YES or NO with one sentence of reasoning."
-\`\`\`
-
-Multi-modal evaluation is a powerful capability unique to GenLayer — traditional smart contracts have no way to reason about images or other binary data.`,
+### What You'll Learn
+Add \`execute_proposal()\` — the owner finalizes a proposal as "passed" or "rejected" based on the vote tally.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address, u256, TreeMap, DynArray
-from dataclasses import dataclass
 
-PENDING = "PENDING"
-APPROVED = "APPROVED"
-REJECTED = "REJECTED"
-EXECUTED = "EXECUTED"
+import json
+from genlayer import *
 
-@dataclass
-class Proposal:
-    title: str
-    proposer: Address
-    votes_for: int = 0
-    votes_against: int = 0
-    status: str = "PENDING"
 
-class GovernanceDAO(gl.Contract):
-    name: str
-    admin: Address
-    treasury: u256
-    member_count: int
-    proposal_count: int
-    members: TreeMap[Address, bool]
-    proposals: TreeMap[int, Proposal]
-    proposal_ids: DynArray[int]
+class GovMind(gl.Contract):
+    owner: Address
+    dao_name: str
+    dao_description: str
 
-    def __init__(self, name: str) -> None:
-        self.name = name
-        self.admin = gl.message.sender_address
-        self.treasury = u256(0)
-        self.member_count = 0
-        self.proposal_count = 0
-        self.members = TreeMap[Address, bool]()
-        self.proposals = TreeMap[int, Proposal]()
-        self.proposal_ids = DynArray[int]()
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.dao_name = "GovMind"
+        self.dao_description = "An AI-governed decentralised autonomous organisation."
 
     @gl.public.view
-    def get_name(self) -> str:
-        return self.name
+    def get_dao_name(self) -> str:
+        return self.dao_name
+
+    @gl.public.view
+    def get_dao_description(self) -> str:
+        return self.dao_description
+
+    @gl.public.view
+    def get_owner(self) -> str:
+        return self.owner.as_hex
+
+    @gl.public.view
+    def get_contract_summary(self) -> str:
+        return self.dao_name + ": " + self.dao_description
 
     @gl.public.write
-    def visual_assess_proposal(self, pid: int, screenshot_url: str) -> str:
-        # TODO: get the proposal title from self.proposals[pid]
-        # TODO: render the screenshot_url with web.render → bytes
-        # TODO: build a prompt asking if it looks like a legitimate proposal
-        # TODO: call exec_prompt(prompt, images=[screenshot]) and return the result
-        pass`,
-  task: "Implement `visual_assess_proposal()` to render the screenshot URL, pass the image to `exec_prompt` with a text prompt about the proposal's legitimacy, and return the LLM's verdict.",
+    def update_dao_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update"
+        assert len(new_description) > 0, "Description cannot be empty"
+        self.dao_description = new_description
+
+    proposal_count: u256
+    proposal_titles: TreeMap[str, str]
+    proposal_descriptions: TreeMap[str, str]
+    proposal_proposers: TreeMap[str, Address]
+    proposal_statuses: TreeMap[str, str]
+    members: TreeMap[str, bool]
+
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.dao_name = "GovMind"
+        self.dao_description = "An AI-governed decentralised autonomous organisation."
+        self.proposal_count = u256(0)
+        self.members[self.owner.as_hex] = True
+
+    @gl.public.write
+    def create_proposal(self, title: str, description: str) -> str:
+        assert self.members.get(gl.message.sender_address.as_hex, False), "Only members can propose"
+        assert len(title) > 0, "Title cannot be empty"
+        assert len(description) > 0, "Description cannot be empty"
+        proposal_id = str(self.proposal_count)
+        self.proposal_titles[proposal_id] = title
+        self.proposal_descriptions[proposal_id] = description
+        self.proposal_proposers[proposal_id] = gl.message.sender_address
+        self.proposal_statuses[proposal_id] = "open"
+        self.proposal_count = self.proposal_count + u256(1)
+        return proposal_id
+
+    proposal_ids: DynArray[str]
+
+    @gl.public.view
+    def get_proposal_json(self, proposal_id: str) -> str:
+        assert proposal_id in self.proposal_titles, "Proposal not found"
+        return json.dumps({
+            "id": proposal_id,
+            "title": self.proposal_titles[proposal_id],
+            "description": self.proposal_descriptions[proposal_id],
+            "proposer": self.proposal_proposers[proposal_id].as_hex,
+            "status": self.proposal_statuses[proposal_id],
+        }, sort_keys=True)
+
+    @gl.public.view
+    def get_open_proposals_json(self) -> str:
+        result = []
+        for pid in self.proposal_ids:
+            if self.proposal_statuses[pid] == "open":
+                result.append({"id": pid, "title": self.proposal_titles[pid]})
+        return json.dumps(result, sort_keys=True)
+
+    @gl.public.view
+    def get_all_proposals_json(self) -> str:
+        result = []
+        for pid in self.proposal_ids:
+            result.append({"id": pid, "title": self.proposal_titles[pid], "status": self.proposal_statuses[pid]})
+        return json.dumps(result, sort_keys=True)
+
+    @gl.public.write
+    def close_proposal(self, proposal_id: str) -> None:
+        assert proposal_id in self.proposal_titles, "Proposal not found"
+        assert gl.message.sender_address == self.owner, "Only owner can close"
+        assert self.proposal_statuses[proposal_id] == "open", "Only open proposals can be closed"
+        self.proposal_statuses[proposal_id] = "closed"
+
+    for_votes: TreeMap[str, u256]
+    against_votes: TreeMap[str, u256]
+    has_voted: TreeMap[str, bool]
+
+    @gl.public.write
+    def vote(self, proposal_id: str, support: bool) -> None:
+        assert proposal_id in self.proposal_titles, "Proposal not found"
+        voter_key = proposal_id + "_" + gl.message.sender_address.as_hex
+        assert not self.has_voted.get(voter_key, False), "Already voted"
+        assert self.members.get(gl.message.sender_address.as_hex, False), "Only members can vote"
+        assert self.proposal_statuses[proposal_id] == "open", "Proposal must be open"
+        self.has_voted[voter_key] = True
+        if support:
+            self.for_votes[proposal_id] = self.for_votes.get(proposal_id, u256(0)) + u256(1)
+        else:
+            self.against_votes[proposal_id] = self.against_votes.get(proposal_id, u256(0)) + u256(1)
+
+    @gl.public.write
+    def execute_proposal(self, proposal_id: str) -> None:
+        assert proposal_id in self.proposal_titles, "Proposal not found"
+        assert self.proposal_statuses[proposal_id] == "open", "Proposal must be open"
+        assert gl.message.sender_address == self.owner, "Only owner can execute"
+        fv = self.for_votes.get(proposal_id, u256(0))
+        av = self.against_votes.get(proposal_id, u256(0))
+        if fv > av:
+            self.proposal_statuses[proposal_id] = "passed"
+        else:
+            self.proposal_statuses[proposal_id] = "rejected"
+`,
+  task: `Add \`execute_proposal(self, proposal_id: str)\` with \`@gl.public.write\`. Owner only, proposal must be open. Compare for_votes > against_votes to set status "passed" or "rejected".`,
   hints: [
-    "Get the proposal title: `p = self.proposals[pid]` then `title = p.title`.",
-    "Render: `screenshot = gl.nondet.web.render(screenshot_url)` — this returns bytes.",
-    "Call: `return gl.nondet.exec_prompt(f'Does this screenshot represent a legitimate proposal titled \"{title}\"? Answer YES or NO.', images=[screenshot])`.",
+    "Check sender == self.owner and status == open.",
+    "Use if/else: set 'passed' if for > against, else 'rejected'.",
+    "Key line: `self.proposal_statuses[proposal_id] = 'passed'`",
   ],
 };
 

@@ -3,93 +3,156 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 19,
   projectPath: "FREELANCE_ESCROW",
-  explanation: `## Lesson 19 — Multi-Modal Evaluation: Images + LLM
+  explanation: `## Lesson 19 — Release and Refund Patterns
 
-Reading HTML text is useful, but a client browsing portfolios cares about *visual design*. GenLayer supports multi-modal LLM calls that combine a text prompt with one or more images.
-
-### exec_prompt with Images
-
-\`\`\`python
-screenshot = gl.nondet.web.render(url)
-result = gl.nondet.exec_prompt(
-    "Does this portfolio look professional? Reply YES or NO.",
-    images=[screenshot]
-)
-\`\`\`
-
-The \`images\` parameter accepts a list of \`bytes\` objects (PNG or JPEG). The LLM receives both the text prompt and the images together.
-
-### visual_evaluate Method
-
-The new \`visual_evaluate(self, applicant: Address) -> str\` method:
-
-1. Looks up the applicant's \`portfolio_url\` from \`self.applications\`.
-2. Calls \`gl.nondet.web.render\` to get a screenshot.
-3. Passes the screenshot to \`exec_prompt\` alongside a question about professionalism.
-4. Returns the LLM's verdict.
-
-### Why Combine Both?
-
-- Text evaluation catches keyword relevance (does the portfolio mention React, etc.).
-- Visual evaluation catches design quality (clean layout, good typography).
-- Together they give a much stronger signal than either alone — which Lesson 20's capstone will combine.`,
+### What You'll Learn
+Add \`confirm_delivery()\` to release escrowed funds to the freelancer, and ensure duplicate payments are blocked.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address, u256, TreeMap
-from dataclasses import dataclass
 
-OPEN = "OPEN"
-AWARDED = "AWARDED"
-WORK_SUBMITTED = "WORK_SUBMITTED"
-COMPLETE = "COMPLETE"
-DISPUTED = "DISPUTED"
+import json
+from genlayer import *
 
 
-@dataclass
-class Application:
-    bio: str
-    portfolio_url: str
-    score: int = 0
+class TrustLance(gl.Contract):
+    owner: Address
+    platform_name: str
+    platform_description: str
 
-
-class FreelanceEscrow(gl.Contract):
-    title: str
-    client: Address
-    budget: u256
-    is_open: bool
-    status: str
-    applicant_count: int
-    applications: TreeMap[Address, Application]
-    awarded_to: Address
-    deliverable_url: str
-
-    def __init__(self, title: str, budget: u256) -> None:
-        self.title = title
-        self.client = gl.message.sender_address
-        self.budget = budget
-        self.is_open = True
-        self.status = OPEN
-        self.applicant_count = 0
-        self.applications = TreeMap[Address, Application]()
-        self.deliverable_url = ""
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.platform_name = "TrustLance"
+        self.platform_description = "A GenLayer freelance escrow platform."
 
     @gl.public.view
-    def get_title(self) -> str:
-        return self.title
+    def get_platform_name(self) -> str:
+        return self.platform_name
+
+    @gl.public.view
+    def get_platform_description(self) -> str:
+        return self.platform_description
+
+    @gl.public.view
+    def get_owner(self) -> str:
+        return self.owner.as_hex
+
+    @gl.public.view
+    def get_contract_summary(self) -> str:
+        return self.platform_name + ": " + self.platform_description
 
     @gl.public.write
-    def visual_evaluate(self, applicant: Address) -> str:
-        # TODO: get applicant's portfolio_url from self.applications
-        # TODO: render screenshot with gl.nondet.web.render
-        # TODO: call exec_prompt with images=[screenshot] asking if portfolio looks professional
-        # TODO: return the LLM verdict as a stripped string
-        pass
+    def update_platform_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update"
+        assert len(new_description) > 0, "Description cannot be empty"
+        self.platform_description = new_description
+
+    job_count: u256
+    job_titles: TreeMap[str, str]
+    job_descriptions: TreeMap[str, str]
+    job_clients: TreeMap[str, Address]
+    job_budgets: TreeMap[str, u256]
+    job_statuses: TreeMap[str, str]
+    job_freelancers: TreeMap[str, Address]
+
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.platform_name = "TrustLance"
+        self.platform_description = "A GenLayer freelance escrow platform."
+        self.job_count = u256(0)
+
+    @gl.public.write
+    def create_job(self, title: str, description: str, budget: u256) -> str:
+        assert len(title) > 0, "Title cannot be empty"
+        assert len(description) > 0, "Description cannot be empty"
+        assert budget > u256(0), "Budget must be greater than zero"
+
+        job_id = str(self.job_count)
+        self.job_titles[job_id] = title
+        self.job_descriptions[job_id] = description
+        self.job_clients[job_id] = gl.message.sender_address
+        self.job_budgets[job_id] = budget
+        self.job_statuses[job_id] = "open"
+        self.job_count = self.job_count + u256(1)
+        return job_id
+
+    job_ids: DynArray[str]
+
+    @gl.public.view
+    def get_job_json(self, job_id: str) -> str:
+        assert job_id in self.job_titles, "Job not found"
+        return json.dumps({
+            "id": job_id,
+            "title": self.job_titles[job_id],
+            "description": self.job_descriptions[job_id],
+            "client": self.job_clients[job_id].as_hex,
+            "budget": str(self.job_budgets[job_id]),
+            "status": self.job_statuses[job_id],
+        }, sort_keys=True)
+
+    @gl.public.view
+    def get_open_jobs_json(self) -> str:
+        result = []
+        for job_id in self.job_ids:
+            if self.job_statuses[job_id] == "open":
+                result.append({"id": job_id, "title": self.job_titles[job_id], "budget": str(self.job_budgets[job_id])})
+        return json.dumps(result, sort_keys=True)
+
+    @gl.public.view
+    def get_all_jobs_json(self) -> str:
+        result = []
+        for job_id in self.job_ids:
+            result.append({"id": job_id, "title": self.job_titles[job_id], "status": self.job_statuses[job_id]})
+        return json.dumps(result, sort_keys=True)
+
+    @gl.public.write
+    def close_job(self, job_id: str) -> None:
+        assert job_id in self.job_titles, "Job not found"
+        assert gl.message.sender_address == self.job_clients[job_id], "Only client can close"
+        assert self.job_statuses[job_id] == "open", "Only open jobs can be closed"
+        self.job_statuses[job_id] = "closed"
+
+    job_escrow: TreeMap[str, u256]
+    job_deliveries: TreeMap[str, str]
+    freelancer_claimed: TreeMap[str, bool]
+
+    @gl.public.write.payable
+    def fund_job(self, job_id: str) -> None:
+        assert job_id in self.job_titles, "Job not found"
+        assert gl.message.sender_address == self.job_clients[job_id], "Only client can fund"
+        assert self.job_statuses[job_id] == "open", "Job must be open"
+        assert gl.message.value >= self.job_budgets[job_id], "Insufficient funds"
+        self.job_escrow[job_id] = gl.message.value
+        self.job_statuses[job_id] = "funded"
+
+    @gl.public.write
+    def accept_job(self, job_id: str) -> None:
+        assert job_id in self.job_titles, "Job not found"
+        assert self.job_statuses[job_id] == "funded", "Job must be funded"
+        self.job_freelancers[job_id] = gl.message.sender_address
+        self.job_statuses[job_id] = "accepted"
+
+    @gl.public.write
+    def submit_delivery(self, job_id: str, delivery_ref: str) -> None:
+        assert job_id in self.job_titles, "Job not found"
+        assert gl.message.sender_address == self.job_freelancers[job_id], "Only freelancer can submit"
+        assert self.job_statuses[job_id] == "accepted", "Job must be accepted"
+        self.job_deliveries[job_id] = delivery_ref
+        self.job_statuses[job_id] = "delivered"
+
+    @gl.public.write
+    def confirm_delivery(self, job_id: str) -> None:
+        assert job_id in self.job_titles, "Job not found"
+        assert gl.message.sender_address == self.job_clients[job_id], "Only client can confirm"
+        assert self.job_statuses[job_id] == "delivered", "Delivery must be submitted first"
+        assert not self.freelancer_claimed.get(job_id, False), "Already paid"
+        self.freelancer_claimed[job_id] = True
+        self.job_statuses[job_id] = "completed"
+        gl.message.recipient_address.transfer(self.job_escrow[job_id])
 `,
-  task: "Implement `visual_evaluate()` to look up the applicant's `portfolio_url`, render it with `gl.nondet.web.render`, then call `gl.nondet.exec_prompt` with `images=[screenshot]` asking whether the portfolio looks professional. Return the stripped result.",
+  task: `Add the \`confirm_delivery(self, job_id: str)\` method that: checks caller is client, status is "delivered", not already claimed; marks claimed, sets status "completed", and calls \`gl.message.recipient_address.transfer(self.job_escrow[job_id])\`.`,
   hints: [
-    "Retrieve the application: `app = self.applications.get(applicant, None)` and raise UserError if not found.",
-    "Render: `screenshot = gl.nondet.web.render(app.portfolio_url)`.",
-    "Evaluate: `return gl.nondet.exec_prompt(f'Does this portfolio look professional for a {self.title} job? Reply YES or NO.', images=[screenshot]).strip()`.",
+    "Check freelancer_claimed[job_id] is False before paying.",
+    "Set freelancer_claimed[job_id] = True before transferring.",
+    "Key line: `gl.message.recipient_address.transfer(self.job_escrow[job_id])`",
   ],
 };
 

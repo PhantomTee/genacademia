@@ -3,100 +3,67 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 9,
   projectPath: "FREELANCE_ESCROW",
-  explanation: `## Lesson 9 — Fetching Real Web Content
+  explanation: `## Lesson 9 — Job Records with TreeMap
 
-Evaluating a freelancer based only on their portfolio *URL* is shallow — the LLM is essentially guessing from a domain name. GenLayer lets contracts fetch actual web content at transaction time via \`gl.nondet.web.get\`.
-
-### gl.nondet.web.get
-
-\`\`\`python
-html = gl.nondet.web.get("https://example.com/portfolio")
-\`\`\`
-
-This returns the raw HTTP response body as a string. Every validator node fetches the same URL independently; GenLayer's consensus protocol reconciles any minor differences in the returned content.
-
-### Truncating for the Prompt Window
-
-Web pages can be very large. LLMs have context limits, and sending a 500 KB HTML dump is slow and expensive. A practical rule is to take only the first 2 000 characters:
-
-\`\`\`python
-content = gl.nondet.web.get(url)[:2000]
-\`\`\`
-
-This typically captures the \`<head>\` metadata and the hero section — enough for a meaningful assessment.
-
-### Enriched Prompt
-
-Combine the fetched content with the job description:
-
-\`\`\`
-Job title: Build a personal portfolio website...
-Portfolio content: <html><head><title>Jane Doe – Frontend...
-\`\`\`
-
-The LLM now has real evidence to work with rather than just a URL, leading to much more reliable HIRE / PASS decisions.
-
-### Error Handling
-
-If the URL is unreachable, \`web.get\` may raise. Wrap in a try/except and fall back to URL-only evaluation if needed.`,
+### What You'll Learn
+Add title, description, and status fields as \`TreeMap[str, str]\` to store complete job records per ID.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address, u256
+
+import json
+from genlayer import *
 
 
-class FreelanceEscrow(gl.Contract):
-    title: str
-    client: Address
-    budget: u256
-    is_open: bool
-    applicant_count: int
-    last_applicant: Address
-    awarded_to: Address
+class TrustLance(gl.Contract):
+    owner: Address
+    platform_name: str
+    platform_description: str
 
-    def __init__(self, title: str, budget: u256) -> None:
-        self.title = title
-        self.client = gl.message.sender_address
-        self.budget = budget
-        self.is_open = True
-        self.applicant_count = 0
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.platform_name = "TrustLance"
+        self.platform_description = "A GenLayer freelance escrow platform."
 
     @gl.public.view
-    def get_title(self) -> str:
-        return self.title
+    def get_platform_name(self) -> str:
+        return self.platform_name
+
+    @gl.public.view
+    def get_platform_description(self) -> str:
+        return self.platform_description
+
+    @gl.public.view
+    def get_owner(self) -> str:
+        return self.owner.as_hex
+
+    @gl.public.view
+    def get_contract_summary(self) -> str:
+        return self.platform_name + ": " + self.platform_description
 
     @gl.public.write
-    def apply(self, bio: str) -> None:
-        if not bio:
-            raise gl.vm.UserError("bio required")
-        if self.last_applicant == gl.message.sender_address:
-            raise gl.vm.UserError("already applied")
-        self.applicant_count += 1
-        self.last_applicant = gl.message.sender_address
+    def update_platform_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update"
+        assert len(new_description) > 0, "Description cannot be empty"
+        self.platform_description = new_description
 
-    def _safe_text(self, text: str) -> str:
-        clean = text.replace("\\n", " ").replace("\\r", " ")
-        for ch in ["[", "]", "{", "}"]:
-            clean = clean.replace(ch, "")
-        return clean[:500]
+    job_count: u256
+    job_titles: TreeMap[str, str]
+    job_descriptions: TreeMap[str, str]
+    job_clients: TreeMap[str, Address]
+    job_budgets: TreeMap[str, u256]
+    job_statuses: TreeMap[str, str]
+    job_freelancers: TreeMap[str, Address]
 
-    @gl.public.write
-    def evaluate_applicant(self, applicant: Address, portfolio_url: str) -> dict:
-        safe_url = self._safe_text(portfolio_url)
-        # TODO: fetch the portfolio page with gl.nondet.web.get
-        # TODO: truncate to first 2000 chars
-        # TODO: include the content in the prompt alongside self.title
-        prompt = (
-            f"Job title: {self.title}\\n"
-            f"Portfolio URL: [USER INPUT: {safe_url}]\\n"
-            "Respond with JSON only: {\\\"hire\\\": bool, \\\"reason\\\": str, \\\"score\\\": 0-100}"
-        )
-        return gl.nondet.exec_prompt(prompt, response_format="json")
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.platform_name = "TrustLance"
+        self.platform_description = "A GenLayer freelance escrow platform."
+        self.job_count = u256(0)
 `,
-  task: "Update `evaluate_applicant()` to fetch the portfolio page using `gl.nondet.web.get(portfolio_url)`, truncate the result to 2 000 characters, and include it in the prompt as `Portfolio content: {content}`.",
+  task: `Add \`job_titles\`, \`job_descriptions\`, and \`job_statuses\` as \`TreeMap[str, str]\` fields. Update \`create_job_stub\` to store all three, setting status to \`"open"\`.`,
   hints: [
-    "`gl.nondet.web.get(url)` returns the page body as a string — assign it to a variable.",
-    "Truncate immediately: `content = gl.nondet.web.get(safe_url)[:2000]`.",
-    "Add `f'Portfolio content: {content}\\\\n'` to your prompt string before calling `exec_prompt`.",
+    "Add three TreeMap[str, str] fields at class level.",
+    "Set job_statuses[job_id] = 'open' in the creation method.",
+    "Key line: `self.job_statuses[job_id] = 'open'`",
   ],
 };
 

@@ -3,43 +3,13 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 4,
   projectPath: "PREDICTION_MARKET",
-  explanation: `## Lesson 4 — \`@gl.public.write\`: State Mutation with Access Control
+  explanation: `## Lesson 4 — Updating Market Metadata
 
-\`@gl.public.write\` marks a method that modifies contract state. Unlike view calls, write calls create a transaction on-chain and require validator consensus. They cost gas.
+### What You'll Learn
 
-\`\`\`python
-@gl.public.write
-def update_platform_description(self, new_description: str) -> None:
-    self.platform_description = new_description
-\`\`\`
+Students learn how to modify state using @gl.public.write, and why write methods need permission checks.
 
-### Access control with \`assert\`
-
-Anyone on the blockchain can call a public write method unless you add a guard. The standard pattern uses \`assert\` to check the caller's identity:
-
-\`\`\`python
-assert gl.message.sender_address == self.owner, "Only owner can update description"
-\`\`\`
-
-If the assertion fails, the entire transaction reverts — no state changes are applied and the error message is returned to the caller.
-
-### Validating inputs
-
-Use \`assert\` for input validation too. Check that strings are non-empty before storing them:
-
-\`\`\`python
-assert len(new_description) > 0, "Description cannot be empty"
-\`\`\`
-
-Always place all assertions **before** any state modifications. This way, if any check fails, nothing gets written to the chain — a clean all-or-nothing pattern.
-
-### Order matters
-
-1. Assert caller is authorised.
-2. Assert inputs are valid.
-3. Modify state.
-
-This ordering is a smart-contract best practice: validate completely before touching storage.`,
+Writing to Intelligent Contracts modifies state and needs network processing, unlike read calls.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 from genlayer import *
@@ -67,11 +37,17 @@ class PredictX(gl.Contract):
     def get_owner(self) -> str:
         return self.owner.as_hex
 `,
-  task: "Add a write method `update_platform_description(self, new_description: str) -> None` that: (1) asserts the caller is the owner, (2) asserts the new description is not empty, then (3) updates `self.platform_description`.",
+  task: `Add a write method:
+
+update_platform_description(new_description: str)
+Rules:
+
+Only owner can update it.
+Description cannot be empty.`,
   hints: [
-    "Use `@gl.public.write` (not `@gl.public.view`) since this method changes state.",
-    "The ownership check is: `assert gl.message.sender_address == self.owner, \"Only owner can update description\"`",
-    "The empty-string check is: `assert len(new_description) > 0, \"Description cannot be empty\"`",
+    "Add a write method:.",
+    "update_platform_description(new_description: str)",
+    "Key line: `def __init__(self) -> None:`",
   ],
 };
 

@@ -3,118 +3,156 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 19,
   projectPath: "DEVELOPER_REPUTATION",
-  explanation: `## Lesson 19 — Multi-Modal AI: Scoring from Screenshots
+  explanation: `## Lesson 19 — Confirm and Refund Purchase
 
-Combining \`web.render\` (Lesson 18) with \`exec_prompt\` creates a **multi-modal scoring pipeline**: the LLM sees the actual rendered profile image, not just text. This captures visual signals like profile completeness, pinned repo quality, and contribution graph density.
-
-### Passing Images to exec_prompt
-
-\`\`\`python
-screenshot = gl.nondet.web.render(url)
-result = gl.nondet.exec_prompt(
-    "Score this GitHub profile page 0-100 based on visual presentation and activity. Return only an integer.",
-    images=[screenshot]
-)
-score = int(result.strip())
-\`\`\`
-
-The \`images\` parameter accepts a list of \`bytes\` objects. The LLM receives them as image inputs alongside the text prompt.
-
-### Crafting the Visual Prompt
-
-Guide the LLM on what to look for:
-
-\`\`\`
-"You are evaluating a GitHub developer profile screenshot.
-Score it 0-100 considering:
-- Profile completeness (bio, avatar, location)
-- Number and quality of pinned repositories
-- Contribution activity visible in the graph
-- Professional presentation
-Return ONLY an integer."
-\`\`\`
-
-### When to Use Visual vs Text Scoring
-
-- **Text scoring** (web.get) — better for README content, code quality signals
-- **Visual scoring** (web.render) — better for profile presentation, activity patterns
-
-Combining both (Lesson 20) yields the most comprehensive assessment.
-
-### Your Mission
-
-Implement \`visual_score(dev)\` to render the developer's GitHub profile and pass the screenshot to \`exec_prompt\` for a 0–100 visual quality score.
-
-**Key concepts this lesson:** \`exec_prompt\` with \`images\`, multi-modal LLM, visual scoring.`,
+### What You'll Learn
+Add refund logic: if a buyer requests a refund before confirming, escrowed funds return to them.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address, u256, TreeMap
-from dataclasses import dataclass
+
+import json
+from genlayer import *
 
 
-@dataclass
-class DevProfile:
-    handle: str
-    github_url: str
-    score: int = 0
-    endorsements: int = 0
-    verified: bool = False
-    status: str = "UNVERIFIED"
+class CodeVault(gl.Contract):
+    owner: Address
+    platform_name: str
+    platform_description: str
 
-
-class DeveloperReputation(gl.Contract):
-    registry_name: str
-    developer_count: int
-    curator: Address
-    registry_id: u256
-    active: bool
-    developers: TreeMap[Address, DevProfile]
-
-    def __init__(self, name: str, registry_id: u256) -> None:
-        self.registry_name = name
-        self.developer_count = 0
-        self.curator = gl.message.sender_address
-        self.registry_id = registry_id
-        self.active = True
-        self.developers = TreeMap[Address, DevProfile]()
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.platform_name = "CodeVault"
+        self.platform_description = "A GenLayer private code marketplace."
 
     @gl.public.view
-    def get_registry_name(self) -> str:
-        return self.registry_name
+    def get_platform_name(self) -> str:
+        return self.platform_name
 
     @gl.public.view
-    def get_curator(self) -> str:
-        return str(self.curator)
+    def get_platform_description(self) -> str:
+        return self.platform_description
+
+    @gl.public.view
+    def get_owner(self) -> str:
+        return self.owner.as_hex
+
+    @gl.public.view
+    def get_contract_summary(self) -> str:
+        return self.platform_name + ": " + self.platform_description
 
     @gl.public.write
-    def register(self, handle: str, github_url: str) -> None:
-        if not handle:
-            raise gl.vm.UserError("handle cannot be empty")
-        if self.developers.get(gl.message.sender_address, None) is not None:
-            raise gl.vm.UserError("already registered")
-        profile = DevProfile(handle=handle, github_url=github_url)
-        self.developers[gl.message.sender_address] = profile
-        self.developer_count += 1
+    def update_platform_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update"
+        assert len(new_description) > 0, "Description cannot be empty"
+        self.platform_description = new_description
 
-    def _safe_url(self, url: str) -> str:
-        if not url.startswith("https://github.com/"):
-            raise gl.vm.UserError("invalid GitHub URL")
-        url = url.split()[0].split('"')[0].split("'")[0]
-        return url
+    listing_count: u256
+    listing_titles: TreeMap[str, str]
+    listing_descriptions: TreeMap[str, str]
+    listing_sellers: TreeMap[str, Address]
+    listing_prices: TreeMap[str, u256]
+    listing_statuses: TreeMap[str, str]
+    listing_source_hashes: TreeMap[str, str]
+    listing_previews: TreeMap[str, str]
+
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.platform_name = "CodeVault"
+        self.platform_description = "A GenLayer private code marketplace."
+        self.listing_count = u256(0)
 
     @gl.public.write
-    def visual_score(self, dev: Address) -> int:
-        pass
+    def create_listing(self, title: str, description: str, price: u256, source_hash: str, preview: str) -> str:
+        assert len(title) > 0, "Title cannot be empty"
+        assert len(description) > 0, "Description cannot be empty"
+        assert price > u256(0), "Price must be greater than zero"
+        assert len(source_hash) > 0, "Source hash cannot be empty"
+        listing_id = str(self.listing_count)
+        self.listing_titles[listing_id] = title
+        self.listing_descriptions[listing_id] = description
+        self.listing_sellers[listing_id] = gl.message.sender_address
+        self.listing_prices[listing_id] = price
+        self.listing_statuses[listing_id] = "active"
+        self.listing_source_hashes[listing_id] = source_hash
+        self.listing_previews[listing_id] = preview
+        self.listing_count = self.listing_count + u256(1)
+        return listing_id
+
+    listing_ids: DynArray[str]
 
     @gl.public.view
-    def get_developer_count(self) -> int:
-        return self.developer_count
+    def get_listing_json(self, listing_id: str) -> str:
+        assert listing_id in self.listing_titles, "Listing not found"
+        return json.dumps({
+            "id": listing_id,
+            "title": self.listing_titles[listing_id],
+            "description": self.listing_descriptions[listing_id],
+            "seller": self.listing_sellers[listing_id].as_hex,
+            "price": str(self.listing_prices[listing_id]),
+            "status": self.listing_statuses[listing_id],
+            "preview": self.listing_previews[listing_id],
+        }, sort_keys=True)
+
+    @gl.public.view
+    def get_active_listings_json(self) -> str:
+        result = []
+        for lid in self.listing_ids:
+            if self.listing_statuses[lid] == "active":
+                result.append({"id": lid, "title": self.listing_titles[lid], "price": str(self.listing_prices[lid])})
+        return json.dumps(result, sort_keys=True)
+
+    @gl.public.view
+    def get_all_listings_json(self) -> str:
+        result = []
+        for lid in self.listing_ids:
+            result.append({"id": lid, "title": self.listing_titles[lid], "status": self.listing_statuses[lid]})
+        return json.dumps(result, sort_keys=True)
+
+    @gl.public.write
+    def remove_listing(self, listing_id: str) -> None:
+        assert listing_id in self.listing_titles, "Listing not found"
+        assert gl.message.sender_address == self.listing_sellers[listing_id] or gl.message.sender_address == self.owner, "Not authorized"
+        assert self.listing_statuses[listing_id] == "active", "Only active listings can be removed"
+        self.listing_statuses[listing_id] = "removed"
+
+    purchase_buyers: TreeMap[str, Address]
+    purchase_escrow: TreeMap[str, u256]
+    purchase_statuses: TreeMap[str, str]
+    seller_claimed: TreeMap[str, bool]
+
+    @gl.public.write.payable
+    def buy_listing(self, listing_id: str) -> None:
+        assert listing_id in self.listing_titles, "Listing not found"
+        assert self.listing_statuses[listing_id] == "active", "Listing must be active"
+        seller = self.listing_sellers[listing_id]
+        assert gl.message.sender_address != seller, "Seller cannot buy own listing"
+        assert gl.message.value >= self.listing_prices[listing_id], "Insufficient payment"
+        self.purchase_buyers[listing_id] = gl.message.sender_address
+        self.purchase_escrow[listing_id] = gl.message.value
+        self.purchase_statuses[listing_id] = "pending"
+        self.listing_statuses[listing_id] = "pending"
+
+    @gl.public.write
+    def confirm_purchase(self, listing_id: str) -> None:
+        assert listing_id in self.listing_titles, "Listing not found"
+        assert gl.message.sender_address == self.purchase_buyers[listing_id], "Only buyer can confirm"
+        assert self.purchase_statuses[listing_id] == "pending", "Purchase must be pending"
+        assert not self.seller_claimed.get(listing_id, False), "Already paid"
+        self.seller_claimed[listing_id] = True
+        self.purchase_statuses[listing_id] = "completed"
+        self.listing_statuses[listing_id] = "sold"
+        seller = self.listing_sellers[listing_id]
+        seller.transfer(self.purchase_escrow[listing_id])
+
+    @gl.public.view
+    def get_source_hash(self, listing_id: str) -> str:
+        assert self.purchase_statuses.get(listing_id, "") == "completed", "Purchase must be completed to access source"
+        return self.listing_source_hashes[listing_id]
 `,
-  task: "Implement `visual_score(dev)` to render the developer's GitHub profile page as a screenshot and pass it to `exec_prompt` (with `images=[screenshot]`) asking for a 0–100 quality score. Return the integer result.",
+  task: `Add \`refund_purchase(self, listing_id: str)\` — buyer only, purchase must be pending, not already claimed. Transfer escrow back to sender and set status to "refunded".`,
   hints: [
-    "Retrieve the profile and github_url, then call `screenshot = gl.nondet.web.render(profile.github_url)` to get the image bytes.",
-    "Call `result = gl.nondet.exec_prompt(prompt, images=[screenshot])` where the prompt asks for a score of 0-100. Use `response_format='text'`.",
-    "Convert the result to an integer: `return int(result.strip())`.",
+    "Check sender == purchase_buyers[listing_id].",
+    "Check purchase_statuses == pending.",
+    "Key line: `gl.message.sender_address.transfer(self.purchase_escrow[listing_id])`",
   ],
 };
 

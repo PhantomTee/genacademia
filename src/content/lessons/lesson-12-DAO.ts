@@ -3,91 +3,82 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 12,
   projectPath: "DAO",
-  explanation: `## Lesson 12 — Dataclasses for Rich Proposal Objects
+  explanation: `## Lesson 12 — Proposal JSON View
 
-A proposal title alone is not enough for governance. Members need to know who proposed it, how many votes it has received, and what its current status is. The \`@dataclass\` decorator lets you bundle all this data into a typed, serialisable object that GenLayer stores on-chain.
-
-### @dataclass
-
-Python's \`dataclass\` decorator auto-generates \`__init__\`, \`__repr__\`, and other boilerplate. In GenLayer, dataclass instances can be stored as \`TreeMap\` values — the runtime handles serialisation transparently.
-
-\`\`\`python
-from dataclasses import dataclass
-
-@dataclass
-class Proposal:
-    title: str
-    proposer: Address
-    votes_for: int = 0
-    votes_against: int = 0
-\`\`\`
-
-Fields with default values (like \`votes_for = 0\`) are optional at construction time. Required fields (like \`title\` and \`proposer\`) must be provided.
-
-### Creating a Proposal
-
-\`\`\`python
-p = Proposal(
-    title=title,
-    proposer=gl.message.sender_address,
-)
-self.proposals[pid] = p
-\`\`\`
-
-### The vote Stub
-
-\`vote(pid, approve)\` will let members cast a vote for or against a proposal. For now it is stubbed as \`pass\` — you will implement it in the next lesson. The signature — pid (int) and approve (bool) — is all that matters here.
-
-### Upgrading TreeMap Value Type
-
-Change \`proposals\` from \`TreeMap[int, str]\` to \`TreeMap[int, Proposal]\`. This is a breaking change: migrate your \`submit_proposal\` method to store full \`Proposal\` objects instead of plain strings.`,
+### What You'll Learn
+Build \`get_proposal_json(proposal_id)\` so the frontend can read proposal details as a JSON string.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address, u256, TreeMap, DynArray
-from dataclasses import dataclass
 
-# TODO: define Proposal dataclass with: title (str), proposer (Address),
-#       votes_for (int=0), votes_against (int=0)
+import json
+from genlayer import *
 
-class GovernanceDAO(gl.Contract):
-    name: str
-    admin: Address
-    treasury: u256
-    member_count: int
-    proposal_count: int
-    members: TreeMap[Address, bool]
-    proposals: TreeMap[int, "Proposal"]
-    proposal_ids: DynArray[int]
 
-    def __init__(self, name: str) -> None:
-        self.name = name
-        self.admin = gl.message.sender_address
-        self.treasury = u256(0)
-        self.member_count = 0
-        self.proposal_count = 0
-        self.members = TreeMap[Address, bool]()
-        self.proposals = TreeMap[int, Proposal]()
-        self.proposal_ids = DynArray[int]()
+class GovMind(gl.Contract):
+    owner: Address
+    dao_name: str
+    dao_description: str
+
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.dao_name = "GovMind"
+        self.dao_description = "An AI-governed decentralised autonomous organisation."
 
     @gl.public.view
-    def get_name(self) -> str:
-        return self.name
+    def get_dao_name(self) -> str:
+        return self.dao_name
+
+    @gl.public.view
+    def get_dao_description(self) -> str:
+        return self.dao_description
+
+    @gl.public.view
+    def get_owner(self) -> str:
+        return self.owner.as_hex
+
+    @gl.public.view
+    def get_contract_summary(self) -> str:
+        return self.dao_name + ": " + self.dao_description
 
     @gl.public.write
-    def submit_proposal(self, title: str) -> int:
-        # TODO: create a Proposal(title=title, proposer=gl.message.sender_address)
-        # TODO: store in self.proposals, append id to proposal_ids, increment count
-        # TODO: return the proposal id
-        pass
+    def update_dao_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update"
+        assert len(new_description) > 0, "Description cannot be empty"
+        self.dao_description = new_description
+
+    proposal_count: u256
+    proposal_titles: TreeMap[str, str]
+    proposal_descriptions: TreeMap[str, str]
+    proposal_proposers: TreeMap[str, Address]
+    proposal_statuses: TreeMap[str, str]
+    members: TreeMap[str, bool]
+
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.dao_name = "GovMind"
+        self.dao_description = "An AI-governed decentralised autonomous organisation."
+        self.proposal_count = u256(0)
+        self.members[self.owner.as_hex] = True
 
     @gl.public.write
-    def vote(self, pid: int, approve: bool) -> None:
-        pass`,
-  task: "Define the `Proposal` dataclass with `title`, `proposer`, `votes_for=0`, and `votes_against=0`, then update `submit_proposal()` to create and store a full `Proposal` object.",
+    def create_proposal(self, title: str, description: str) -> str:
+        assert self.members.get(gl.message.sender_address.as_hex, False), "Only members can propose"
+        assert len(title) > 0, "Title cannot be empty"
+        assert len(description) > 0, "Description cannot be empty"
+        proposal_id = str(self.proposal_count)
+        self.proposal_titles[proposal_id] = title
+        self.proposal_descriptions[proposal_id] = description
+        self.proposal_proposers[proposal_id] = gl.message.sender_address
+        self.proposal_statuses[proposal_id] = "open"
+        self.proposal_count = self.proposal_count + u256(1)
+        return proposal_id
+
+    proposal_ids: DynArray[str]
+`,
+  task: `Add \`get_proposal_json(self, proposal_id: str) -> str\` with \`@gl.public.view\`. Assert proposal exists, return \`json.dumps({...}, sort_keys=True)\` with id, title, description, proposer (as hex), status.`,
   hints: [
-    "Add `@dataclass` decorator above `class Proposal:` and list fields with type annotations; use `= 0` defaults for vote counters.",
-    "In `submit_proposal`: `pid = self.proposal_count; p = Proposal(title=title, proposer=gl.message.sender_address); self.proposals[pid] = p`.",
-    "Append and increment: `self.proposal_ids.append(pid); self.proposal_count += 1; return pid`.",
+    "Assert proposal_id in self.proposal_titles first.",
+    "Use json.dumps and sort_keys=True.",
+    "Key line: `'proposer': self.proposal_proposers[proposal_id].as_hex`",
   ],
 };
 

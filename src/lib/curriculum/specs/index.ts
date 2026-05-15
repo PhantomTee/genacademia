@@ -21,3 +21,21 @@ export async function getSpec(
   }
   return specCache[lessonId]?.[projectPath] ?? null;
 }
+
+const SHAPE_LABELS: Record<string, string> = {
+  nonEmpty: "non-empty value",
+  exact: "exact value",
+  custom: "custom check",
+};
+
+export async function getHumanSpec(
+  lessonId: number,
+  projectPath: ProjectPath
+): Promise<{ method: string; humanExpected: string } | null> {
+  const spec = await getSpec(lessonId, projectPath);
+  if (!spec) return null;
+  return {
+    method: spec.method,
+    humanExpected: SHAPE_LABELS[spec.expectedShape] ?? spec.expectedShape,
+  };
+}

@@ -3,118 +3,110 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 13,
   projectPath: "DEVELOPER_REPUTATION",
-  explanation: `## Lesson 13 — Address Type and Curator Transfer
+  explanation: `## Lesson 13 — Active Listings View
 
-So far the curator is set once at deployment and can never change. Real systems need curator rotation — for example, handing control to a DAO or a new admin. \`transfer_curator\` implements this safely.
-
-### Address Equality
-
-Comparing addresses in GenLayer uses standard Python equality:
-
-\`\`\`python
-if gl.message.sender_address != self.curator:
-    raise gl.vm.UserError("only curator can transfer")
-\`\`\`
-
-### Zero-Address Check
-
-The zero address (\`Address("0x" + "0" * 40)\`) is the null address. Transferring curator rights to it would lock the contract permanently:
-
-\`\`\`python
-zero = Address("0x" + "0" * 40)
-if new_curator == zero:
-    raise gl.vm.UserError("cannot transfer to zero address")
-\`\`\`
-
-### Transfer Pattern
-
-A safe transfer has three guards:
-1. Caller must be the current curator
-2. New address must not be zero
-3. New address must differ from current curator (optional but good practice)
-
-\`\`\`python
-@gl.public.write
-def transfer_curator(self, new_curator: Address) -> None:
-    if gl.message.sender_address != self.curator:
-        raise gl.vm.UserError("only curator")
-    zero = Address("0x" + "0" * 40)
-    if new_curator == zero:
-        raise gl.vm.UserError("zero address")
-    self.curator = new_curator
-\`\`\`
-
-### Why This Matters
-
-Curator transfer is a critical security function. An error here could lock the registry permanently or hand control to an attacker. Always test the three branches.
-
-**Key concepts this lesson:** \`Address\` comparison, zero-address check, ownership transfer pattern.`,
+### What You'll Learn
+Build \`get_active_listings_json()\` filtering by status "active" using a DynArray loop.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address, u256, TreeMap
-from dataclasses import dataclass
+
+import json
+from genlayer import *
 
 
-@dataclass
-class DevProfile:
-    handle: str
-    github_url: str
-    score: int = 0
-    endorsements: int = 0
-    verified: bool = False
+class CodeVault(gl.Contract):
+    owner: Address
+    platform_name: str
+    platform_description: str
 
-
-class DeveloperReputation(gl.Contract):
-    registry_name: str
-    developer_count: int
-    curator: Address
-    registry_id: u256
-    active: bool
-    developers: TreeMap[Address, DevProfile]
-
-    def __init__(self, name: str, registry_id: u256) -> None:
-        self.registry_name = name
-        self.developer_count = 0
-        self.curator = gl.message.sender_address
-        self.registry_id = registry_id
-        self.active = True
-        self.developers = TreeMap[Address, DevProfile]()
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.platform_name = "CodeVault"
+        self.platform_description = "A GenLayer private code marketplace."
 
     @gl.public.view
-    def get_registry_name(self) -> str:
-        return self.registry_name
+    def get_platform_name(self) -> str:
+        return self.platform_name
 
     @gl.public.view
-    def get_curator(self) -> str:
-        return str(self.curator)
+    def get_platform_description(self) -> str:
+        return self.platform_description
 
     @gl.public.view
-    def is_active(self) -> bool:
-        return self.active
+    def get_owner(self) -> str:
+        return self.owner.as_hex
+
+    @gl.public.view
+    def get_contract_summary(self) -> str:
+        return self.platform_name + ": " + self.platform_description
 
     @gl.public.write
-    def register(self, handle: str) -> None:
-        if not handle:
-            raise gl.vm.UserError("handle cannot be empty")
-        if self.developers.get(gl.message.sender_address, None) is not None:
-            raise gl.vm.UserError("already registered")
-        profile = DevProfile(handle=handle, github_url="")
-        self.developers[gl.message.sender_address] = profile
-        self.developer_count += 1
+    def update_platform_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update"
+        assert len(new_description) > 0, "Description cannot be empty"
+        self.platform_description = new_description
+
+    listing_count: u256
+    listing_titles: TreeMap[str, str]
+    listing_descriptions: TreeMap[str, str]
+    listing_sellers: TreeMap[str, Address]
+    listing_prices: TreeMap[str, u256]
+    listing_statuses: TreeMap[str, str]
+    listing_source_hashes: TreeMap[str, str]
+    listing_previews: TreeMap[str, str]
+
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.platform_name = "CodeVault"
+        self.platform_description = "A GenLayer private code marketplace."
+        self.listing_count = u256(0)
 
     @gl.public.write
-    def transfer_curator(self, new_curator: Address) -> None:
-        pass
+    def create_listing(self, title: str, description: str, price: u256, source_hash: str, preview: str) -> str:
+        assert len(title) > 0, "Title cannot be empty"
+        assert len(description) > 0, "Description cannot be empty"
+        assert price > u256(0), "Price must be greater than zero"
+        assert len(source_hash) > 0, "Source hash cannot be empty"
+        listing_id = str(self.listing_count)
+        self.listing_titles[listing_id] = title
+        self.listing_descriptions[listing_id] = description
+        self.listing_sellers[listing_id] = gl.message.sender_address
+        self.listing_prices[listing_id] = price
+        self.listing_statuses[listing_id] = "active"
+        self.listing_source_hashes[listing_id] = source_hash
+        self.listing_previews[listing_id] = preview
+        self.listing_count = self.listing_count + u256(1)
+        return listing_id
+
+    listing_ids: DynArray[str]
 
     @gl.public.view
-    def get_developer_count(self) -> int:
-        return self.developer_count
+    def get_listing_json(self, listing_id: str) -> str:
+        assert listing_id in self.listing_titles, "Listing not found"
+        return json.dumps({
+            "id": listing_id,
+            "title": self.listing_titles[listing_id],
+            "description": self.listing_descriptions[listing_id],
+            "seller": self.listing_sellers[listing_id].as_hex,
+            "price": str(self.listing_prices[listing_id]),
+            "status": self.listing_statuses[listing_id],
+            "preview": self.listing_previews[listing_id],
+        }, sort_keys=True)
+
+    @gl.public.view
+    def get_active_listings_json(self) -> str:
+        result = []
+        for lid in self.listing_ids:
+            if self.listing_statuses[lid] == "active":
+                result.append({"id": lid, "title": self.listing_titles[lid], "price": str(self.listing_prices[lid])})
+        return json.dumps(result, sort_keys=True)
+
+
 `,
-  task: "Implement `transfer_curator()` so that only the current curator can call it, the new address cannot be the zero address, and the curator is updated to `new_curator`.",
+  task: `Add \`get_active_listings_json(self) -> str\` looping \`listing_ids\` and filtering for status "active". Include id, title, price.`,
   hints: [
-    "Check `if gl.message.sender_address != self.curator: raise gl.vm.UserError('only curator')` first.",
-    "Check for zero address: `if new_curator == Address('0x' + '0' * 40): raise gl.vm.UserError('zero address')`.",
-    "If both checks pass, assign `self.curator = new_curator`.",
+    "Filter: if self.listing_statuses[lid] == 'active':",
+    "Include 'price': str(self.listing_prices[lid]).",
+    "Key line: `if self.listing_statuses[lid] == 'active':`",
   ],
 };
 

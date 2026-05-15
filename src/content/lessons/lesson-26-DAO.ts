@@ -3,147 +3,195 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 26,
   projectPath: "DAO",
-  explanation: `## Lesson 26 — Randomness: Tie-Breaking with gl.get_random_u8
+  explanation: `## Lesson 26 — DAO Safety Mistakes
 
-Token-weighted voting can produce exact ties. Rather than leaving proposals in limbo, GovMind uses on-chain randomness to break ties fairly.
-
-### gl.get_random_u8
-
-\`\`\`python
-n = gl.get_random_u8()  # returns an int in range [0, 255]
-\`\`\`
-
-GenLayer's \`get_random_u8\` generates a consensus-safe random byte. Unlike off-chain randomness, it participates in GenLayer's BFT consensus — every validator produces the same random value for the same transaction, so the result is deterministic across the network yet unpredictable to any single party before the transaction is finalised.
-
-### The Tie-Breaking Pattern
-
-\`\`\`python
-r = gl.get_random_u8()   # 0–255
-status = "APPROVED" if r < 128 else "REJECTED"
-\`\`\`
-
-Because the range is 0–255, values 0–127 map to APPROVED and 128–255 to REJECTED — giving each outcome a 50/50 chance (128 values each).
-
-### Access Control and Preconditions
-
-Tie-breaking should only run when genuinely tied and only be callable by the admin:
-
-\`\`\`python
-if gl.message.sender_address != self.admin:
-    raise gl.vm.UserError("Admin only")
-if proposal.votes_for != proposal.votes_against:
-    raise gl.vm.UserError("Not a tie")
-\`\`\`
-
-### Why On-Chain Randomness Matters
-
-Off-chain randomness (e.g. timestamps) can be manipulated by validators. \`gl.get_random_u8\` is safe from manipulation because it is derived from the consensus process itself — no single party can bias the outcome.`,
+### What You'll Learn
+Guard against: non-member proposals, duplicate votes, early execution (no votes yet), and re-execution.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address, u256, TreeMap
-from dataclasses import dataclass
 
-PENDING = "PENDING"
-APPROVED = "APPROVED"
-REJECTED = "REJECTED"
-EXECUTED = "EXECUTED"
+import json
+from genlayer import *
 
-MIN_MEMBERSHIP_FEE = 10**15  # 0.001 GEN in wei
 
-@dataclass
-class Proposal:
-    title: str
-    description: str
-    ref_url: str
-    proposer: Address
-    status: str = "PENDING"
-    votes_for: int = 0
-    votes_against: int = 0
-    executed: bool = False
+class GovMind(gl.Contract):
+    owner: Address
+    dao_name: str
+    dao_description: str
 
-class GovernanceDAO(gl.Contract):
-    name: str
-    admin: Address
-    treasury: u256
-    member_count: int
-    proposal_count: int
-    members: TreeMap[Address, bool]
-    proposals: TreeMap[int, Proposal]
-    proposal_index: gl.VectorStorage
-    token_contract: Address
-
-    def __init__(self, name: str, token_contract: Address) -> None:
-        self.name = name
-        self.admin = gl.message.sender_address
-        self.treasury = u256(0)
-        self.member_count = 0
-        self.proposal_count = 0
-        self.members = TreeMap[Address, bool]()
-        self.proposals = TreeMap[int, Proposal]()
-        self.proposal_index = gl.VectorStorage()
-        self.token_contract = token_contract
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.dao_name = "GovMind"
+        self.dao_description = "An AI-governed decentralised autonomous organisation."
 
     @gl.public.view
-    def get_name(self) -> str:
-        return self.name
+    def get_dao_name(self) -> str:
+        return self.dao_name
 
     @gl.public.view
-    def get_voter_weight(self, voter: Address) -> int:
-        return int(gl.call_contract(self.token_contract, "balance_of", [voter]))
+    def get_dao_description(self) -> str:
+        return self.dao_description
 
-    @gl.public.write.payable
-    def join(self) -> None:
-        caller = gl.message.sender_address
-        if gl.message.value < MIN_MEMBERSHIP_FEE:
-            raise gl.vm.UserError("Membership fee too low")
-        if self.members.get(caller, False):
-            raise gl.vm.UserError("Already a member")
-        self.members[caller] = True
-        self.member_count += 1
-        self.treasury += gl.message.value
+    @gl.public.view
+    def get_owner(self) -> str:
+        return self.owner.as_hex
+
+    @gl.public.view
+    def get_contract_summary(self) -> str:
+        return self.dao_name + ": " + self.dao_description
 
     @gl.public.write
-    def submit_proposal(self, title: str, description: str, ref_url: str) -> int:
-        caller = gl.message.sender_address
-        if not self.members.get(caller, False):
-            raise gl.vm.UserError("Members only")
-        pid = self.proposal_count
-        self.proposals[pid] = Proposal(
-            title=title, description=description, ref_url=ref_url, proposer=caller
-        )
-        self.proposal_count += 1
-        self.proposal_index.add(title, {"pid": pid})
-        return pid
+    def update_dao_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update"
+        assert len(new_description) > 0, "Description cannot be empty"
+        self.dao_description = new_description
+
+    proposal_count: u256
+    proposal_titles: TreeMap[str, str]
+    proposal_descriptions: TreeMap[str, str]
+    proposal_proposers: TreeMap[str, Address]
+    proposal_statuses: TreeMap[str, str]
+    members: TreeMap[str, bool]
+
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.dao_name = "GovMind"
+        self.dao_description = "An AI-governed decentralised autonomous organisation."
+        self.proposal_count = u256(0)
+        self.members[self.owner.as_hex] = True
 
     @gl.public.write
-    def weighted_vote(self, pid: int, approve: bool) -> None:
-        caller = gl.message.sender_address
-        if not self.members.get(caller, False):
-            raise gl.vm.UserError("Members only")
-        proposal = self.proposals.get(pid)
-        if proposal is None:
-            raise gl.vm.UserError("Proposal not found")
-        if proposal.status != PENDING:
-            raise gl.vm.UserError("Proposal not open for voting")
-        weight = self.get_voter_weight(caller)
-        if approve:
-            proposal.votes_for += weight
+    def create_proposal(self, title: str, description: str) -> str:
+        assert self.members.get(gl.message.sender_address.as_hex, False), "Only members can propose"
+        assert len(title) > 0, "Title cannot be empty"
+        assert len(description) > 0, "Description cannot be empty"
+        proposal_id = str(self.proposal_count)
+        self.proposal_titles[proposal_id] = title
+        self.proposal_descriptions[proposal_id] = description
+        self.proposal_proposers[proposal_id] = gl.message.sender_address
+        self.proposal_statuses[proposal_id] = "open"
+        self.proposal_count = self.proposal_count + u256(1)
+        return proposal_id
+
+    proposal_ids: DynArray[str]
+
+    @gl.public.view
+    def get_proposal_json(self, proposal_id: str) -> str:
+        assert proposal_id in self.proposal_titles, "Proposal not found"
+        return json.dumps({
+            "id": proposal_id,
+            "title": self.proposal_titles[proposal_id],
+            "description": self.proposal_descriptions[proposal_id],
+            "proposer": self.proposal_proposers[proposal_id].as_hex,
+            "status": self.proposal_statuses[proposal_id],
+        }, sort_keys=True)
+
+    @gl.public.view
+    def get_open_proposals_json(self) -> str:
+        result = []
+        for pid in self.proposal_ids:
+            if self.proposal_statuses[pid] == "open":
+                result.append({"id": pid, "title": self.proposal_titles[pid]})
+        return json.dumps(result, sort_keys=True)
+
+    @gl.public.view
+    def get_all_proposals_json(self) -> str:
+        result = []
+        for pid in self.proposal_ids:
+            result.append({"id": pid, "title": self.proposal_titles[pid], "status": self.proposal_statuses[pid]})
+        return json.dumps(result, sort_keys=True)
+
+    @gl.public.write
+    def close_proposal(self, proposal_id: str) -> None:
+        assert proposal_id in self.proposal_titles, "Proposal not found"
+        assert gl.message.sender_address == self.owner, "Only owner can close"
+        assert self.proposal_statuses[proposal_id] == "open", "Only open proposals can be closed"
+        self.proposal_statuses[proposal_id] = "closed"
+
+    for_votes: TreeMap[str, u256]
+    against_votes: TreeMap[str, u256]
+    has_voted: TreeMap[str, bool]
+
+    @gl.public.write
+    def vote(self, proposal_id: str, support: bool) -> None:
+        assert proposal_id in self.proposal_titles, "Proposal not found"
+        voter_key = proposal_id + "_" + gl.message.sender_address.as_hex
+        assert not self.has_voted.get(voter_key, False), "Already voted"
+        assert self.members.get(gl.message.sender_address.as_hex, False), "Only members can vote"
+        assert self.proposal_statuses[proposal_id] == "open", "Proposal must be open"
+        self.has_voted[voter_key] = True
+        if support:
+            self.for_votes[proposal_id] = self.for_votes.get(proposal_id, u256(0)) + u256(1)
         else:
-            proposal.votes_against += weight
+            self.against_votes[proposal_id] = self.against_votes.get(proposal_id, u256(0)) + u256(1)
 
     @gl.public.write
-    def resolve_tie(self, pid: int) -> None:
-        # TODO: raise UserError if caller is not admin
-        # TODO: get proposal, raise if not found
-        # TODO: raise UserError if votes_for != votes_against
-        # TODO: call gl.get_random_u8()
-        # TODO: set proposal.status = "APPROVED" if r < 128 else "REJECTED"
-        pass`,
-  task: "Implement `resolve_tie()` (admin only): verify the proposal exists and votes are exactly tied, then use `gl.get_random_u8()` to set the proposal status to APPROVED (< 128) or REJECTED (>= 128).",
+    def execute_proposal(self, proposal_id: str) -> None:
+        assert proposal_id in self.proposal_titles, "Proposal not found"
+        assert self.proposal_statuses[proposal_id] == "open", "Proposal must be open"
+        assert gl.message.sender_address == self.owner, "Only owner can execute"
+        fv = self.for_votes.get(proposal_id, u256(0))
+        av = self.against_votes.get(proposal_id, u256(0))
+        if fv > av:
+            self.proposal_statuses[proposal_id] = "passed"
+        else:
+            self.proposal_statuses[proposal_id] = "rejected"
+
+    proposal_ai_summaries: TreeMap[str, str]
+
+    @gl.public.write
+    def analyze_proposal_with_ai(self, proposal_id: str) -> str:
+        assert proposal_id in self.proposal_titles, "Proposal not found"
+        title = self.proposal_titles[proposal_id]
+        description = self.proposal_descriptions[proposal_id]
+        fv = str(self.for_votes.get(proposal_id, u256(0)))
+        av = str(self.against_votes.get(proposal_id, u256(0)))
+        prompt = (
+            f"DAO Proposal Analysis:\\n"
+            f"Title: {title}\\n"
+            f"Description: {description}\\n"
+            f"For votes: {fv}, Against votes: {av}\\n\\n"
+            f"Respond with JSON: {{\\"summary\\": \\"one sentence\\", "
+            f"\\"risk_score\\": 0-100, \\"recommendation\\": \\"approve\\" or \\"reject\\"}}"
+        )
+        def run(prompt):
+            result = gl.nondet.exec_prompt(prompt)
+            import re
+            m = re.search(r'\\{.*\\}', result, re.DOTALL)
+            return m.group(0) if m else result
+        result = gl.eq_principle_strict_eq(run, prompt)
+        self.proposal_ai_summaries[proposal_id] = result
+        return result
+
+    @gl.public.view
+    def get_frontend_actions_json(self) -> str:
+        return json.dumps({
+            "propose": "create_proposal(title, description)",
+            "vote_yes": "vote(proposal_id, True)",
+            "vote_no": "vote(proposal_id, False)",
+            "list": "get_open_proposals_json()",
+            "detail": "get_proposal_json(proposal_id)",
+            "analyze": "analyze_proposal_with_ai(proposal_id)",
+            "execute": "execute_proposal(proposal_id)",
+        }, sort_keys=True)
+
+    @gl.public.view
+    def get_test_checklist_json(self) -> str:
+        return json.dumps([
+            "Create a proposal as a member",
+            "Reject proposal from non-member",
+            "Vote yes as member",
+            "Reject duplicate vote",
+            "Vote no as another member",
+            "Execute proposal — passes if for > against",
+            "Analyze proposal with AI",
+            "Reject execution of closed proposal",
+        ], sort_keys=True)
+`,
+  task: `Add a guard inside \`execute_proposal\`: assert the proposal has at least one vote before execution. Add message: "No votes cast yet".`,
   hints: [
-    "Check admin and fetch the proposal first, then guard: `if proposal.votes_for != proposal.votes_against: raise gl.vm.UserError('Not a tie')`.",
-    "`gl.get_random_u8()` returns an int from 0 to 255 inclusive — use the midpoint 128 as the decision boundary for a fair 50/50 split.",
-    "Full resolution: `r = gl.get_random_u8(); proposal.status = APPROVED if r < 128 else REJECTED`.",
+    "Sum for_votes and against_votes and check > u256(0).",
+    "Place the assert after the status check.",
+    "Key line: `assert fv + av > u256(0), 'No votes cast yet'`",
   ],
 };
 

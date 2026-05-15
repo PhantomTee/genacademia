@@ -3,95 +3,105 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 13,
   projectPath: "FREELANCE_ESCROW",
-  explanation: `## Lesson 13 — Address Ownership Transfer
+  explanation: `## Lesson 13 — Listing Open Jobs
 
-Sometimes a client needs to hand off control of a contract — perhaps selling the job posting or delegating to a team member. \`transfer_client\` lets the current client designate a new owner.
-
-### Why Ownership Transfer Is Tricky
-
-- **Only the current client can transfer** — otherwise anyone could hijack the contract.
-- **The zero address is an invalid destination** — transferring to the null address would permanently lock the contract since no-one controls the zero address.
-- **Address comparison** uses \`==\` in Python. \`Address\` objects support equality natively.
-
-### Implementation Pattern
-
-\`\`\`python
-@gl.public.write
-def transfer_client(self, new_client: Address) -> None:
-    if gl.message.sender_address != self.client:
-        raise gl.vm.UserError("only client can transfer")
-    if new_client == Address("0x0000000000000000000000000000000000000000"):
-        raise gl.vm.UserError("cannot transfer to zero address")
-    self.client = new_client
-\`\`\`
-
-### Protecting Subsequent Operations
-
-After transfer, \`close_applications\`, \`award_job\`, and \`release_payment\` all check \`self.client\` — so the new owner automatically gains full privileges while the old one loses them. No individual method needs to be updated.
-
-This single-slot ownership model is the simplest safe pattern. More complex multi-sig schemes build on this foundation.`,
+### What You'll Learn
+Build \`get_open_jobs_json()\` by looping \`job_ids\` and filtering for \`"open"\` status.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address, u256, TreeMap
-from dataclasses import dataclass
+
+import json
+from genlayer import *
 
 
-@dataclass
-class Application:
-    bio: str
-    portfolio_url: str
-    score: int = 0
+class TrustLance(gl.Contract):
+    owner: Address
+    platform_name: str
+    platform_description: str
 
-
-class FreelanceEscrow(gl.Contract):
-    title: str
-    client: Address
-    budget: u256
-    is_open: bool
-    status: str
-    applicant_count: int
-    applications: TreeMap[Address, Application]
-    awarded_to: Address
-
-    def __init__(self, title: str, budget: u256) -> None:
-        self.title = title
-        self.client = gl.message.sender_address
-        self.budget = budget
-        self.is_open = True
-        self.status = "OPEN"
-        self.applicant_count = 0
-        self.applications = TreeMap[Address, Application]()
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.platform_name = "TrustLance"
+        self.platform_description = "A GenLayer freelance escrow platform."
 
     @gl.public.view
-    def get_title(self) -> str:
-        return self.title
+    def get_platform_name(self) -> str:
+        return self.platform_name
 
     @gl.public.view
-    def get_client(self) -> str:
-        return str(self.client)
+    def get_platform_description(self) -> str:
+        return self.platform_description
+
+    @gl.public.view
+    def get_owner(self) -> str:
+        return self.owner.as_hex
+
+    @gl.public.view
+    def get_contract_summary(self) -> str:
+        return self.platform_name + ": " + self.platform_description
 
     @gl.public.write
-    def transfer_client(self, new_client: Address) -> None:
-        pass  # TODO: check caller == client; reject zero address; set self.client = new_client
+    def update_platform_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update"
+        assert len(new_description) > 0, "Description cannot be empty"
+        self.platform_description = new_description
+
+    job_count: u256
+    job_titles: TreeMap[str, str]
+    job_descriptions: TreeMap[str, str]
+    job_clients: TreeMap[str, Address]
+    job_budgets: TreeMap[str, u256]
+    job_statuses: TreeMap[str, str]
+    job_freelancers: TreeMap[str, Address]
+
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.platform_name = "TrustLance"
+        self.platform_description = "A GenLayer freelance escrow platform."
+        self.job_count = u256(0)
 
     @gl.public.write
-    def apply(self, bio: str, portfolio_url: str) -> None:
-        if not bio:
-            raise gl.vm.UserError("bio required")
-        if self.applications.get(gl.message.sender_address, None) is not None:
-            raise gl.vm.UserError("already applied")
-        self.applications[gl.message.sender_address] = Application(bio=bio, portfolio_url=portfolio_url)
-        self.applicant_count += 1
+    def create_job(self, title: str, description: str, budget: u256) -> str:
+        assert len(title) > 0, "Title cannot be empty"
+        assert len(description) > 0, "Description cannot be empty"
+        assert budget > u256(0), "Budget must be greater than zero"
+
+        job_id = str(self.job_count)
+        self.job_titles[job_id] = title
+        self.job_descriptions[job_id] = description
+        self.job_clients[job_id] = gl.message.sender_address
+        self.job_budgets[job_id] = budget
+        self.job_statuses[job_id] = "open"
+        self.job_count = self.job_count + u256(1)
+        return job_id
+
+    job_ids: DynArray[str]
 
     @gl.public.view
-    def get_applicant_count(self) -> int:
-        return self.applicant_count
+    def get_job_json(self, job_id: str) -> str:
+        assert job_id in self.job_titles, "Job not found"
+        return json.dumps({
+            "id": job_id,
+            "title": self.job_titles[job_id],
+            "description": self.job_descriptions[job_id],
+            "client": self.job_clients[job_id].as_hex,
+            "budget": str(self.job_budgets[job_id]),
+            "status": self.job_statuses[job_id],
+        }, sort_keys=True)
+
+
+
+    job_ids: DynArray[str]
+
+    @gl.public.view
+    def get_job_json(self, job_id: str) -> str:
+        assert job_id in self.job_titles, "Job not found"
+        return json.dumps({"id": job_id, "title": self.job_titles[job_id], "budget": str(self.job_budgets[job_id]), "status": self.job_statuses[job_id]}, sort_keys=True)
 `,
-  task: "Implement `transfer_client()`: raise `gl.vm.UserError` if the caller is not the current client or if `new_client` is the zero address, then update `self.client = new_client`.",
+  task: `Add \`get_open_jobs_json(self) -> str\` that loops \`job_ids\`, filters by \`job_statuses[job_id] == "open"\`, and returns a JSON array.`,
   hints: [
-    "Ownership check: `if gl.message.sender_address != self.client: raise gl.vm.UserError('only client can transfer')`.",
-    "Zero address check: compare `new_client` to `Address('0x0000000000000000000000000000000000000000')`.",
-    "If both checks pass, simply assign: `self.client = new_client`.",
+    "Loop: for job_id in self.job_ids: check if status == 'open'.",
+    "Build a list and return json.dumps(result, sort_keys=True).",
+    "Key line: `if self.job_statuses[job_id] == 'open':`",
   ],
 };
 

@@ -3,115 +3,129 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 17,
   projectPath: "FREELANCE_ESCROW",
-  explanation: `## Lesson 17 — Non-Comparative Validation
+  explanation: `## Lesson 17 — Accepting a Job
 
-The validator in \`run_nondet_unsafe\` must **not** re-run the LLM — that defeats the purpose. Instead it performs *non-comparative equivalence*: it checks that the leader's result is structurally plausible, without caring about the exact value.
-
-### What Non-Comparative Means
-
-The validator does NOT ask: "Is this the same answer I would get?" It asks: "Is this answer within the space of valid answers?"
-
-For TrustLance's evaluation:
-- \`score\` should be an integer between 0 and 100.
-- \`hire\` should be a boolean.
-- \`reason\` should be a non-empty string.
-
-If all three checks pass, the result is legitimate regardless of which specific score the leader chose.
-
-### Implementation
-
-\`\`\`python
-def _validate_eval(self, r) -> bool:
-    if not isinstance(r, dict):
-        return False
-    score = r.get("score")
-    hire = r.get("hire")
-    reason = r.get("reason", "")
-    return (
-        isinstance(score, int) and 0 <= score <= 100
-        and isinstance(hire, bool)
-        and isinstance(reason, str) and len(reason) > 0
-    )
-\`\`\`
-
-### Why This Is Sufficient
-
-A validator that just checks ranges can't be gamed (a leader would have to produce an out-of-range value to cheat, which the validator would catch). The score distribution naturally converges across nodes because the same LLM model is used everywhere.`,
+### What You'll Learn
+Any freelancer can accept a funded job. Add \`accept_job()\` to register the worker.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address, u256, TreeMap
-from dataclasses import dataclass
 
-OPEN = "OPEN"
-AWARDED = "AWARDED"
-WORK_SUBMITTED = "WORK_SUBMITTED"
-COMPLETE = "COMPLETE"
-DISPUTED = "DISPUTED"
+import json
+from genlayer import *
 
 
-@dataclass
-class Application:
-    bio: str
-    portfolio_url: str
-    score: int = 0
+class TrustLance(gl.Contract):
+    owner: Address
+    platform_name: str
+    platform_description: str
 
-
-class FreelanceEscrow(gl.Contract):
-    title: str
-    client: Address
-    budget: u256
-    is_open: bool
-    status: str
-    applicant_count: int
-    applications: TreeMap[Address, Application]
-    awarded_to: Address
-    deliverable_url: str
-
-    def __init__(self, title: str, budget: u256) -> None:
-        self.title = title
-        self.client = gl.message.sender_address
-        self.budget = budget
-        self.is_open = True
-        self.status = OPEN
-        self.applicant_count = 0
-        self.applications = TreeMap[Address, Application]()
-        self.deliverable_url = ""
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.platform_name = "TrustLance"
+        self.platform_description = "A GenLayer freelance escrow platform."
 
     @gl.public.view
-    def get_title(self) -> str:
-        return self.title
+    def get_platform_name(self) -> str:
+        return self.platform_name
 
-    def _leader_eval(self, url: str) -> dict:
-        content = gl.nondet.web.get(url)[:2000]
-        prompt = (
-            f"Job: {self.title}\\nPortfolio content: {content}\\n"
-            'Return JSON: {"hire": bool, "reason": str, "score": 0-100}'
-        )
-        return gl.nondet.exec_prompt(prompt, response_format="json")
+    @gl.public.view
+    def get_platform_description(self) -> str:
+        return self.platform_description
 
-    def _validate_eval(self, r) -> bool:
-        # TODO: check r is a dict; score is int 0-100; hire is bool; reason is non-empty str
-        pass
+    @gl.public.view
+    def get_owner(self) -> str:
+        return self.owner.as_hex
+
+    @gl.public.view
+    def get_contract_summary(self) -> str:
+        return self.platform_name + ": " + self.platform_description
 
     @gl.public.write
-    def evaluate_applicant(self, applicant: Address) -> dict:
-        app = self.applications.get(applicant, None)
-        if app is None:
-            raise gl.vm.UserError("applicant not found")
-        url = app.portfolio_url
-        result = gl.vm.run_nondet_unsafe(
-            lambda: self._leader_eval(url),
-            lambda r: self._validate_eval(r)
-        )
-        app.score = result.get("score", 0)
-        self.applications[applicant] = app
-        return result
+    def update_platform_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update"
+        assert len(new_description) > 0, "Description cannot be empty"
+        self.platform_description = new_description
+
+    job_count: u256
+    job_titles: TreeMap[str, str]
+    job_descriptions: TreeMap[str, str]
+    job_clients: TreeMap[str, Address]
+    job_budgets: TreeMap[str, u256]
+    job_statuses: TreeMap[str, str]
+    job_freelancers: TreeMap[str, Address]
+
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.platform_name = "TrustLance"
+        self.platform_description = "A GenLayer freelance escrow platform."
+        self.job_count = u256(0)
+
+    @gl.public.write
+    def create_job(self, title: str, description: str, budget: u256) -> str:
+        assert len(title) > 0, "Title cannot be empty"
+        assert len(description) > 0, "Description cannot be empty"
+        assert budget > u256(0), "Budget must be greater than zero"
+
+        job_id = str(self.job_count)
+        self.job_titles[job_id] = title
+        self.job_descriptions[job_id] = description
+        self.job_clients[job_id] = gl.message.sender_address
+        self.job_budgets[job_id] = budget
+        self.job_statuses[job_id] = "open"
+        self.job_count = self.job_count + u256(1)
+        return job_id
+
+    job_ids: DynArray[str]
+
+    @gl.public.view
+    def get_job_json(self, job_id: str) -> str:
+        assert job_id in self.job_titles, "Job not found"
+        return json.dumps({
+            "id": job_id,
+            "title": self.job_titles[job_id],
+            "description": self.job_descriptions[job_id],
+            "client": self.job_clients[job_id].as_hex,
+            "budget": str(self.job_budgets[job_id]),
+            "status": self.job_statuses[job_id],
+        }, sort_keys=True)
+
+    @gl.public.view
+    def get_open_jobs_json(self) -> str:
+        result = []
+        for job_id in self.job_ids:
+            if self.job_statuses[job_id] == "open":
+                result.append({"id": job_id, "title": self.job_titles[job_id], "budget": str(self.job_budgets[job_id])})
+        return json.dumps(result, sort_keys=True)
+
+    @gl.public.view
+    def get_all_jobs_json(self) -> str:
+        result = []
+        for job_id in self.job_ids:
+            result.append({"id": job_id, "title": self.job_titles[job_id], "status": self.job_statuses[job_id]})
+        return json.dumps(result, sort_keys=True)
+
+    @gl.public.write
+    def close_job(self, job_id: str) -> None:
+        assert job_id in self.job_titles, "Job not found"
+        assert gl.message.sender_address == self.job_clients[job_id], "Only client can close"
+        assert self.job_statuses[job_id] == "open", "Only open jobs can be closed"
+        self.job_statuses[job_id] = "closed"
+
+    job_escrow: TreeMap[str, u256]
+
+    @gl.public.write.payable
+    def fund_job(self, job_id: str) -> None:
+        assert job_id in self.job_titles, "Job not found"
+        assert gl.message.sender_address == self.job_clients[job_id], "Only client can fund"
+        assert self.job_statuses[job_id] == "open", "Job must be open"
+        assert gl.message.value >= self.job_budgets[job_id], "Insufficient funds"
+        self.job_escrow[job_id] = gl.message.value
+        self.job_statuses[job_id] = "funded"
 `,
-  task: "Complete `_validate_eval(self, r) -> bool` to check: `r` is a dict, `r['score']` is an int between 0 and 100, `r['hire']` is a bool, and `r['reason']` is a non-empty string.",
+  task: `Add \`accept_job(self, job_id: str)\` with \`@gl.public.write\`. Verify job is "funded", record \`gl.message.sender_address\` in \`job_freelancers[job_id]\`, set status to "accepted".`,
   hints: [
-    "Start with `if not isinstance(r, dict): return False`.",
-    "Check the score: `score = r.get('score'); if not isinstance(score, int) or not (0 <= score <= 100): return False`.",
-    "Check hire and reason: `isinstance(r.get('hire'), bool) and isinstance(r.get('reason', ''), str) and len(r.get('reason', '')) > 0`.",
+    "Check status == funded before accepting.",
+    "Store the accepting address as the freelancer.",
+    "Key line: `self.job_freelancers[job_id] = gl.message.sender_address`",
   ],
 };
 

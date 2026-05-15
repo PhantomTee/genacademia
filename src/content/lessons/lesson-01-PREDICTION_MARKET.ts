@@ -3,35 +3,38 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 1,
   projectPath: "PREDICTION_MARKET",
-  explanation: `## Lesson 1 — What You Are Building
+  explanation: `## Lesson 1 — What You Are Building: AI-Resolved Markets
 
-Welcome to PredictX: an AI-resolved prediction market built on GenLayer.
+### What You'll Learn
 
-A **prediction market** lets users stake tokens on the outcome of a real-world question — "Will ETH exceed $10,000 by end of 2025?" After the deadline, the market resolves and winners receive the pooled stakes. The hard part is *resolution*: a traditional smart contract cannot browse the web or reason about ambiguous text, so it can't fairly judge outcomes.
+Students learn what a prediction market is, why normal smart contracts struggle with real-world outcomes, and why GenLayer is useful for contracts that need to reason about language, evidence, and real-world events.
 
-GenLayer's **Optimistic Simulator** solves this. Validators run your Python contract with a real web-browsing LLM, reach consensus, and commit the result on-chain — no trusted oracle required.
+They do not write a full contract yet. They inspect the final direction and complete a tiny starter check so the platform knows they understand the project.
 
-Every GenLayer contract is a Python class that extends \`gl.Contract\`:
+### How It Works
 
-\`\`\`python
-class PredictX(gl.Contract):
-    project_name: str          # persisted on-chain automatically
-
-    def __init__(self) -> None:
-        self.project_name = "PredictX"
-\`\`\`
-
-State variables are **class-level type annotations** — they are persisted between calls automatically. You never write to a database; GenLayer handles storage.
-
-\`@gl.public.view\` marks a method as read-only. View methods can be called for free (no gas) and must not modify state:
+The contract begins with the dependency header:
 
 \`\`\`python
-@gl.public.view
-def get_project_name(self) -> str:
-    return self.project_name
+# { "Depends": "py-genlayer:test" }
 \`\`\`
 
-The file always begins with the SDK dependency header, then \`from genlayer import *\`, then the class definition.`,
+Then it imports GenLayer:
+
+\`\`\`python
+from genlayer import *
+\`\`\`
+
+The contract class extends:
+
+\`\`\`python
+gl.Contract
+\`\`\`
+
+The first state variable is:
+
+project_name: str
+The constructor initializes it, and get_project_name() exposes it as a read-only method.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 from genlayer import *
@@ -47,11 +50,13 @@ class PredictX(gl.Contract):
     def get_project_name(self) -> str:
         return self.project_name
 `,
-  task: "Change the project name from \"PredictX\" to \"PredictX: AI-Resolved Prediction Market\" inside the constructor.",
+  task: `Change the project name from "PredictX" to:
+
+PredictX: AI-Resolved Prediction Market`,
   hints: [
-    "The only change needed is in `__init__` — find the line where `self.project_name` is assigned.",
-    "Replace the string value `\"PredictX\"` with the longer name including the colon and subtitle.",
-    "The correct value is: `self.project_name = \"PredictX: AI-Resolved Prediction Market\"`",
+    "Change the project name from 'PredictX' to:.",
+    "PredictX: AI-Resolved Prediction Market",
+    "Key line: `Calling:`",
   ],
 };
 

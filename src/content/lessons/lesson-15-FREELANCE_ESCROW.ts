@@ -3,140 +3,118 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 15,
   projectPath: "FREELANCE_ESCROW",
-  explanation: `## Lesson 15 — Capstone: Full Data Structures Contract
+  explanation: `## Lesson 15 — Major Upgrade: Browseable Freelance Marketplace
 
-This capstone consolidates the TreeMap, dataclass, and state machine into a single contract that exposes clean view methods for a frontend to consume.
-
-### View Methods for Status
-
-\`\`\`python
-@gl.public.view
-def get_status(self) -> str:
-    return self.status
-
-@gl.public.view
-def get_awarded_freelancer(self) -> str:
-    return str(self.awarded_to)
-\`\`\`
-
-These simple getters let any caller inspect the contract's current phase without modifying state.
-
-### State Transition Checklist
-
-By this point every state-changing method should enforce its preconditions:
-
-| Method | Required status | Caller |
-|---|---|---|
-| \`apply\` | OPEN | any |
-| \`award_job\` | OPEN | client |
-| \`submit_work\` | AWARDED | awarded freelancer |
-| \`accept_work\` | WORK_SUBMITTED | client |
-| \`raise_dispute\` | WORK_SUBMITTED | client |
-
-### Adding accept_work and raise_dispute
-
-Complete the lifecycle by adding:
-
-- \`accept_work()\`: client accepts deliverables → status becomes COMPLETE.
-- \`raise_dispute()\`: client rejects work → status becomes DISPUTED.
-
-Both require \`status == WORK_SUBMITTED\` and \`caller == client\`.
-
-After this lesson TrustLance has a fully correct lifecycle that feeds into the payment and arbitration features ahead.`,
+### What You'll Learn
+Combine job indexing, JSON views, status filtering, and status transitions into a full dashboard-ready contract.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address, u256, TreeMap
-from dataclasses import dataclass
 
-OPEN = "OPEN"
-AWARDED = "AWARDED"
-WORK_SUBMITTED = "WORK_SUBMITTED"
-COMPLETE = "COMPLETE"
-DISPUTED = "DISPUTED"
+import json
+from genlayer import *
 
 
-@dataclass
-class Application:
-    bio: str
-    portfolio_url: str
-    score: int = 0
+class TrustLance(gl.Contract):
+    owner: Address
+    platform_name: str
+    platform_description: str
 
-
-class FreelanceEscrow(gl.Contract):
-    title: str
-    client: Address
-    budget: u256
-    is_open: bool
-    status: str
-    applicant_count: int
-    applications: TreeMap[Address, Application]
-    awarded_to: Address
-    deliverable_url: str
-
-    def __init__(self, title: str, budget: u256) -> None:
-        self.title = title
-        self.client = gl.message.sender_address
-        self.budget = budget
-        self.is_open = True
-        self.status = OPEN
-        self.applicant_count = 0
-        self.applications = TreeMap[Address, Application]()
-        self.deliverable_url = ""
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.platform_name = "TrustLance"
+        self.platform_description = "A GenLayer freelance escrow platform."
 
     @gl.public.view
-    def get_title(self) -> str:
-        return self.title
+    def get_platform_name(self) -> str:
+        return self.platform_name
 
     @gl.public.view
-    def get_status(self) -> str:
-        pass  # TODO: return self.status
+    def get_platform_description(self) -> str:
+        return self.platform_description
 
     @gl.public.view
-    def get_awarded_freelancer(self) -> str:
-        pass  # TODO: return str(self.awarded_to)
+    def get_owner(self) -> str:
+        return self.owner.as_hex
+
+    @gl.public.view
+    def get_contract_summary(self) -> str:
+        return self.platform_name + ": " + self.platform_description
 
     @gl.public.write
-    def apply(self, bio: str, portfolio_url: str) -> None:
-        if self.status != OPEN:
-            raise gl.vm.UserError("applications closed")
-        if not bio:
-            raise gl.vm.UserError("bio required")
-        if self.applications.get(gl.message.sender_address, None) is not None:
-            raise gl.vm.UserError("already applied")
-        self.applications[gl.message.sender_address] = Application(bio=bio, portfolio_url=portfolio_url)
-        self.applicant_count += 1
+    def update_platform_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update"
+        assert len(new_description) > 0, "Description cannot be empty"
+        self.platform_description = new_description
+
+    job_count: u256
+    job_titles: TreeMap[str, str]
+    job_descriptions: TreeMap[str, str]
+    job_clients: TreeMap[str, Address]
+    job_budgets: TreeMap[str, u256]
+    job_statuses: TreeMap[str, str]
+    job_freelancers: TreeMap[str, Address]
+
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.platform_name = "TrustLance"
+        self.platform_description = "A GenLayer freelance escrow platform."
+        self.job_count = u256(0)
 
     @gl.public.write
-    def award_job(self, freelancer: Address) -> None:
-        if gl.message.sender_address != self.client:
-            raise gl.vm.UserError("only client")
-        if self.status != OPEN:
-            raise gl.vm.UserError("not open")
-        self.awarded_to = freelancer
-        self.status = AWARDED
+    def create_job(self, title: str, description: str, budget: u256) -> str:
+        assert len(title) > 0, "Title cannot be empty"
+        assert len(description) > 0, "Description cannot be empty"
+        assert budget > u256(0), "Budget must be greater than zero"
+
+        job_id = str(self.job_count)
+        self.job_titles[job_id] = title
+        self.job_descriptions[job_id] = description
+        self.job_clients[job_id] = gl.message.sender_address
+        self.job_budgets[job_id] = budget
+        self.job_statuses[job_id] = "open"
+        self.job_count = self.job_count + u256(1)
+        return job_id
+
+    job_ids: DynArray[str]
+
+    @gl.public.view
+    def get_job_json(self, job_id: str) -> str:
+        assert job_id in self.job_titles, "Job not found"
+        return json.dumps({
+            "id": job_id,
+            "title": self.job_titles[job_id],
+            "description": self.job_descriptions[job_id],
+            "client": self.job_clients[job_id].as_hex,
+            "budget": str(self.job_budgets[job_id]),
+            "status": self.job_statuses[job_id],
+        }, sort_keys=True)
+
+    @gl.public.view
+    def get_open_jobs_json(self) -> str:
+        result = []
+        for job_id in self.job_ids:
+            if self.job_statuses[job_id] == "open":
+                result.append({"id": job_id, "title": self.job_titles[job_id], "budget": str(self.job_budgets[job_id])})
+        return json.dumps(result, sort_keys=True)
+
+    @gl.public.view
+    def get_all_jobs_json(self) -> str:
+        result = []
+        for job_id in self.job_ids:
+            result.append({"id": job_id, "title": self.job_titles[job_id], "status": self.job_statuses[job_id]})
+        return json.dumps(result, sort_keys=True)
 
     @gl.public.write
-    def submit_work(self, deliverable_url: str) -> None:
-        if self.status != AWARDED:
-            raise gl.vm.UserError("job not yet awarded")
-        if gl.message.sender_address != self.awarded_to:
-            raise gl.vm.UserError("not the hired freelancer")
-        self.deliverable_url = deliverable_url
-        self.status = WORK_SUBMITTED
-
-    @gl.public.write
-    def accept_work(self) -> None:
-        pass  # TODO: require status==WORK_SUBMITTED and caller==client; set status=COMPLETE
-
-    @gl.public.write
-    def raise_dispute(self) -> None:
-        pass  # TODO: require status==WORK_SUBMITTED and caller==client; set status=DISPUTED
+    def close_job(self, job_id: str) -> None:
+        assert job_id in self.job_titles, "Job not found"
+        assert gl.message.sender_address == self.job_clients[job_id], "Only client can close"
+        assert self.job_statuses[job_id] == "open", "Only open jobs can be closed"
+        self.job_statuses[job_id] = "closed"
 `,
-  task: "Implement `get_status()` and `get_awarded_freelancer()` as simple view methods. Implement `accept_work()` (transitions WORK_SUBMITTED → COMPLETE) and `raise_dispute()` (transitions WORK_SUBMITTED → DISPUTED), both gated to the client.",
+  task: `Add \`get_all_jobs_json()\` that returns all jobs (any status) as a JSON array. Include: id, title, status fields.`,
   hints: [
-    "`get_status` returns `self.status`; `get_awarded_freelancer` returns `str(self.awarded_to)`.",
-    "Both `accept_work` and `raise_dispute` need: check `self.status == WORK_SUBMITTED` and `gl.message.sender_address == self.client`.",
-    "`accept_work` sets `self.status = COMPLETE`; `raise_dispute` sets `self.status = DISPUTED`.",
+    "Loop all job_ids without status filtering.",
+    "Include at minimum: id, title, status in each entry.",
+    "Key line: `result.append({'id': job_id, 'title': self.job_titles[job_id], 'status': self.job_statuses[job_id]})`",
   ],
 };
 

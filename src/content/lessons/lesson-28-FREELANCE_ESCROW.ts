@@ -3,227 +3,204 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 28,
   projectPath: "FREELANCE_ESCROW",
-  explanation: `## Lesson 28 — Debugging with gl.emit_debug
+  explanation: `## Lesson 28 — Testing TrustLance
 
-Smart contract bugs are notoriously hard to diagnose. GenLayer provides \`gl.emit_debug(message)\` to emit structured log messages that appear in the transaction trace during development — but are **stripped in production** to keep contracts lean.
-
-### gl.emit_debug
-
-\`\`\`python
-gl.emit_debug("some message")
-gl.emit_debug(f"applicant {str(addr)} applied with score {app.score}")
-\`\`\`
-
-The argument is any string. F-strings are ideal for including dynamic state values.
-
-### Where to Add Debug Logs
-
-The three most important lifecycle events in TrustLance are:
-
-1. **apply()** — log who applied and what bio length they provided.
-2. **award_job()** — log the awarded freelancer address and the current escrow amount.
-3. **release_payment()** — log the recipient and the amount being sent.
-
-\`\`\`python
-# in apply():
-gl.emit_debug(f"new application from {str(addr)}: bio_len={len(bio)}")
-
-# in award_job():
-gl.emit_debug(f"job awarded to {str(freelancer)}, escrow={int(self.escrow_amount)}")
-
-# in release_payment():
-gl.emit_debug(f"releasing {int(self.escrow_amount)} wei to {str(self.awarded_to)}")
-\`\`\`
-
-### Production Stripping
-
-Because \`emit_debug\` calls are removed in production builds, you can be as verbose as you like in development without any gas overhead in live deployments. Use them freely during development.
-
-### Debugging Workflow
-
-1. Add \`emit_debug\` calls to the critical paths.
-2. Submit a transaction in the test environment.
-3. Inspect the transaction trace to see all emitted messages in order.`,
+### What You'll Learn
+Think like a tester before shipping. Add a checklist of test scenarios as a JSON array.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address, u256, TreeMap
-from dataclasses import dataclass
 
-OPEN = "OPEN"
-AWARDED = "AWARDED"
-WORK_SUBMITTED = "WORK_SUBMITTED"
-COMPLETE = "COMPLETE"
-DISPUTED = "DISPUTED"
-
-ZERO_ADDRESS = Address("0x0000000000000000000000000000000000000000")
+import json
+from genlayer import *
 
 
-@dataclass
-class Application:
-    bio: str
-    portfolio_url: str
-    score: int = 0
-    approved: bool = False
+class TrustLance(gl.Contract):
+    owner: Address
+    platform_name: str
+    platform_description: str
 
-
-class FreelanceEscrow(gl.Contract):
-    title: str
-    client: Address
-    budget: u256
-    escrow_amount: u256
-    is_open: bool
-    status: str
-    applicant_count: int
-    applications: TreeMap[Address, Application]
-    awarded_to: Address
-    deliverable_url: str
-    profile_index: gl.VectorStorage
-    reputation_contract: Address
-    mediator_contract: Address
-    version: int
-
-    def __init__(self, title: str, budget: u256, reputation_contract: Address) -> None:
-        self.title = title
-        self.client = gl.message.sender_address
-        self.budget = budget
-        self.escrow_amount = u256(0)
-        self.is_open = True
-        self.status = OPEN
-        self.applicant_count = 0
-        self.applications = TreeMap[Address, Application]()
-        self.awarded_to = ZERO_ADDRESS
-        self.deliverable_url = ""
-        self.profile_index = gl.VectorStorage()
-        self.reputation_contract = reputation_contract
-        self.mediator_contract = ZERO_ADDRESS
-        self.version = 0
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.platform_name = "TrustLance"
+        self.platform_description = "A GenLayer freelance escrow platform."
 
     @gl.public.view
-    def get_title(self) -> str:
-        return self.title
+    def get_platform_name(self) -> str:
+        return self.platform_name
 
     @gl.public.view
-    def get_escrow_amount(self) -> int:
-        return int(self.escrow_amount)
+    def get_platform_description(self) -> str:
+        return self.platform_description
+
+    @gl.public.view
+    def get_owner(self) -> str:
+        return self.owner.as_hex
+
+    @gl.public.view
+    def get_contract_summary(self) -> str:
+        return self.platform_name + ": " + self.platform_description
+
+    @gl.public.write
+    def update_platform_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update"
+        assert len(new_description) > 0, "Description cannot be empty"
+        self.platform_description = new_description
+
+    job_count: u256
+    job_titles: TreeMap[str, str]
+    job_descriptions: TreeMap[str, str]
+    job_clients: TreeMap[str, Address]
+    job_budgets: TreeMap[str, u256]
+    job_statuses: TreeMap[str, str]
+    job_freelancers: TreeMap[str, Address]
+
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.platform_name = "TrustLance"
+        self.platform_description = "A GenLayer freelance escrow platform."
+        self.job_count = u256(0)
+
+    @gl.public.write
+    def create_job(self, title: str, description: str, budget: u256) -> str:
+        assert len(title) > 0, "Title cannot be empty"
+        assert len(description) > 0, "Description cannot be empty"
+        assert budget > u256(0), "Budget must be greater than zero"
+
+        job_id = str(self.job_count)
+        self.job_titles[job_id] = title
+        self.job_descriptions[job_id] = description
+        self.job_clients[job_id] = gl.message.sender_address
+        self.job_budgets[job_id] = budget
+        self.job_statuses[job_id] = "open"
+        self.job_count = self.job_count + u256(1)
+        return job_id
+
+    job_ids: DynArray[str]
+
+    @gl.public.view
+    def get_job_json(self, job_id: str) -> str:
+        assert job_id in self.job_titles, "Job not found"
+        return json.dumps({
+            "id": job_id,
+            "title": self.job_titles[job_id],
+            "description": self.job_descriptions[job_id],
+            "client": self.job_clients[job_id].as_hex,
+            "budget": str(self.job_budgets[job_id]),
+            "status": self.job_statuses[job_id],
+        }, sort_keys=True)
+
+    @gl.public.view
+    def get_open_jobs_json(self) -> str:
+        result = []
+        for job_id in self.job_ids:
+            if self.job_statuses[job_id] == "open":
+                result.append({"id": job_id, "title": self.job_titles[job_id], "budget": str(self.job_budgets[job_id])})
+        return json.dumps(result, sort_keys=True)
+
+    @gl.public.view
+    def get_all_jobs_json(self) -> str:
+        result = []
+        for job_id in self.job_ids:
+            result.append({"id": job_id, "title": self.job_titles[job_id], "status": self.job_statuses[job_id]})
+        return json.dumps(result, sort_keys=True)
+
+    @gl.public.write
+    def close_job(self, job_id: str) -> None:
+        assert job_id in self.job_titles, "Job not found"
+        assert gl.message.sender_address == self.job_clients[job_id], "Only client can close"
+        assert self.job_statuses[job_id] == "open", "Only open jobs can be closed"
+        self.job_statuses[job_id] = "closed"
+
+    job_escrow: TreeMap[str, u256]
+    job_deliveries: TreeMap[str, str]
+    freelancer_claimed: TreeMap[str, bool]
 
     @gl.public.write.payable
-    def fund_escrow(self) -> None:
-        if gl.message.sender_address != self.client:
-            raise gl.vm.UserError("only client can fund")
-        self.escrow_amount += gl.message.value
+    def fund_job(self, job_id: str) -> None:
+        assert job_id in self.job_titles, "Job not found"
+        assert gl.message.sender_address == self.job_clients[job_id], "Only client can fund"
+        assert self.job_statuses[job_id] == "open", "Job must be open"
+        assert gl.message.value >= self.job_budgets[job_id], "Insufficient funds"
+        self.job_escrow[job_id] = gl.message.value
+        self.job_statuses[job_id] = "funded"
 
     @gl.public.write
-    def apply(self, bio: str, portfolio_url: str) -> None:
-        if self.status != OPEN:
-            raise gl.vm.UserError("job is not open")
-        addr = gl.message.sender_address
-        if self.applications.get(addr, None) is not None:
-            raise gl.vm.UserError("already applied")
-        self.applications[addr] = Application(bio=bio, portfolio_url=portfolio_url)
-        self.applicant_count += 1
-        self.profile_index.add(bio, {"applicant": str(addr)})
-        # TODO: emit_debug logging the applicant address and bio length
+    def accept_job(self, job_id: str) -> None:
+        assert job_id in self.job_titles, "Job not found"
+        assert self.job_statuses[job_id] == "funded", "Job must be funded"
+        self.job_freelancers[job_id] = gl.message.sender_address
+        self.job_statuses[job_id] = "accepted"
 
     @gl.public.write
-    def award_job(self, freelancer: Address) -> None:
-        if gl.message.sender_address != self.client:
-            raise gl.vm.UserError("only client can award")
-        if self.status != OPEN:
-            raise gl.vm.UserError("job is not open")
-        if self.applications.get(freelancer, None) is None:
-            raise gl.vm.UserError("applicant not found")
-        self.awarded_to = freelancer
-        self.status = AWARDED
-        # TODO: emit_debug logging the awarded address and escrow amount
+    def submit_delivery(self, job_id: str, delivery_ref: str) -> None:
+        assert job_id in self.job_titles, "Job not found"
+        assert gl.message.sender_address == self.job_freelancers[job_id], "Only freelancer can submit"
+        assert self.job_statuses[job_id] == "accepted", "Job must be accepted"
+        self.job_deliveries[job_id] = delivery_ref
+        self.job_statuses[job_id] = "delivered"
 
     @gl.public.write
-    def submit_work(self, deliverable_url: str) -> None:
-        if gl.message.sender_address != self.awarded_to:
-            raise gl.vm.UserError("only awarded freelancer can submit")
-        if self.status != AWARDED:
-            raise gl.vm.UserError("job is not awarded")
-        self.deliverable_url = deliverable_url
-        self.status = WORK_SUBMITTED
+    def confirm_delivery(self, job_id: str) -> None:
+        assert job_id in self.job_titles, "Job not found"
+        assert gl.message.sender_address == self.job_clients[job_id], "Only client can confirm"
+        assert self.job_statuses[job_id] == "delivered", "Delivery must be submitted first"
+        assert not self.freelancer_claimed.get(job_id, False), "Already paid"
+        self.freelancer_claimed[job_id] = True
+        self.job_statuses[job_id] = "completed"
+        gl.message.recipient_address.transfer(self.job_escrow[job_id])
 
     @gl.public.write
-    def approve_work(self) -> None:
-        if gl.message.sender_address != self.client:
-            raise gl.vm.UserError("only client can approve")
-        if self.status != WORK_SUBMITTED:
-            raise gl.vm.UserError("work has not been submitted")
-        self.status = COMPLETE
-
-    @gl.public.write
-    def raise_dispute(self) -> None:
-        if gl.message.sender_address not in (self.client, self.awarded_to):
-            raise gl.vm.UserError("only client or freelancer can raise dispute")
-        if self.status != WORK_SUBMITTED:
-            raise gl.vm.UserError("can only dispute after work submission")
-        self.status = DISPUTED
-
-    @gl.public.write
-    def release_payment(self) -> None:
-        if gl.message.sender_address != self.client:
-            raise gl.vm.UserError("only client can release payment")
-        if self.status != COMPLETE:
-            raise gl.vm.UserError("job is not complete")
-        # TODO: emit_debug logging recipient and amount before the send
-        gl.send(self.awarded_to, self.escrow_amount)
-        self.escrow_amount = u256(0)
+    def review_dispute_with_ai(self, job_id: str, reason: str) -> str:
+        assert job_id in self.job_titles, "Job not found"
+        assert self.job_statuses[job_id] == "delivered", "Job must be in delivered state"
+        delivery = self.job_deliveries.get(job_id, "no delivery ref")
+        description = self.job_descriptions[job_id]
+        prompt = (
+            f"A freelance job dispute:\\n"
+            f"Job Description: {description}\\n"
+            f"Delivery Reference: {delivery}\\n"
+            f"Dispute Reason: {reason}\\n\\n"
+            f"Respond with JSON: {{\\"verdict\\": \\"release\\" or \\"refund\\", "
+            f"\\"confidence\\": 0-100, \\"reason\\": \\"explanation\\"}}"
+        )
+        def run(prompt):
+            result = gl.nondet.exec_prompt(prompt)
+            import re
+            m = re.search(r'\\{.*\\}', result, re.DOTALL)
+            return m.group(0) if m else result
+        result = gl.eq_principle_strict_eq(run, prompt)
+        return result
 
     @gl.public.view
-    def find_freelancers(self, query: str) -> list:
-        results = self.profile_index.search(query, top_k=5)
-        return [r[1] for r in results]
+    def get_frontend_actions_json(self) -> str:
+        return json.dumps({
+            "create": "create_job(title, description, budget)",
+            "list": "get_open_jobs_json()",
+            "detail": "get_job_json(job_id)",
+            "fund": "fund_job(job_id)",
+            "accept": "accept_job(job_id)",
+            "deliver": "submit_delivery(job_id, delivery_ref)",
+            "confirm": "confirm_delivery(job_id)",
+            "dispute": "review_dispute_with_ai(job_id, reason)",
+        }, sort_keys=True)
 
     @gl.public.view
-    def get_freelancer_score(self, addr: Address) -> int:
-        return int(gl.call_contract(self.reputation_contract, "get_score", [addr]))
-
-    @gl.public.write.payable
-    def full_award_and_fund(self, freelancer: Address) -> None:
-        if gl.message.sender_address != self.client:
-            raise gl.vm.UserError("only client can award")
-        if self.status != OPEN:
-            raise gl.vm.UserError("job is not open")
-        if self.applications.get(freelancer, None) is None:
-            raise gl.vm.UserError("applicant not found")
-        if gl.message.value == 0:
-            raise gl.vm.UserError("must send GEN to fund escrow")
-        self.awarded_to = freelancer
-        self.escrow_amount = gl.message.value
-        self.status = AWARDED
-
-    @gl.public.write
-    def random_arbitration(self) -> None:
-        if self.status != DISPUTED:
-            raise gl.vm.UserError("not in dispute")
-        roll = gl.get_random_u8()
-        if roll < 128:
-            gl.send(self.awarded_to, self.escrow_amount)
-        else:
-            gl.send(self.client, self.escrow_amount)
-        self.escrow_amount = u256(0)
-        self.status = COMPLETE
-
-    @gl.public.write
-    def set_mediator(self, new_mediator: Address) -> None:
-        if gl.message.sender_address != self.client:
-            raise gl.vm.UserError("only client can set mediator")
-        if new_mediator == ZERO_ADDRESS:
-            raise gl.vm.UserError("mediator cannot be zero address")
-        self.mediator_contract = new_mediator
-        self.version += 1
-
-    @gl.public.view
-    def get_version(self) -> int:
-        return self.version
+    def get_test_checklist_json(self) -> str:
+        return json.dumps([
+            "Create a job with valid title and budget",
+            "Reject job with empty title",
+            "Fund the job with correct amount",
+            "Accept job as freelancer",
+            "Submit delivery reference",
+            "Confirm delivery as client — freelancer gets paid",
+            "Dispute unaccepted delivery with AI review",
+            "Reject duplicate payment",
+        ], sort_keys=True)
 `,
-  task: "Add `gl.emit_debug(...)` calls to three methods: in `apply()` log the applicant address and bio length; in `award_job()` log the awarded freelancer and current escrow amount; in `release_payment()` log the recipient address and amount being sent before calling `gl.send`.",
+  task: `Add \`get_test_checklist_json()\` returning a JSON array of test steps covering: job creation, funding, accepting, delivering, confirming, and rejecting duplicate payment.`,
   hints: [
-    "`gl.emit_debug` accepts any string — use an f-string for dynamic values. In `apply()`: `gl.emit_debug(f'new application from {str(addr)}: bio_len={len(bio)}')`.",
-    "In `award_job()` after setting state: `gl.emit_debug(f'job awarded to {str(freelancer)}, escrow={int(self.escrow_amount)}')`.",
-    "In `release_payment()` before `gl.send`: `gl.emit_debug(f'releasing {int(self.escrow_amount)} wei to {str(self.awarded_to)}')`.",
+    "Return json.dumps([...], sort_keys=True) with at least 6 test steps.",
+    "Cover both happy paths and rejection cases.",
+    "Key line: `'Reject duplicate payment'`",
   ],
 };
 

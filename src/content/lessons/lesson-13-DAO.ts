@@ -3,93 +3,103 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 13,
   projectPath: "DAO",
-  explanation: `## Lesson 13 — Address Ownership and Admin Transfer
+  explanation: `## Lesson 13 — Listing Open Proposals
 
-A DAO that can never change its admin is fragile — the original deployer might lose their private key or need to hand off governance. \`transfer_admin\` allows a safe, authorized handover of the admin role using the \`Address\` type.
-
-### Address as a First-Class Value
-
-Addresses are not just strings. In GenLayer, \`Address\` values can be:
-- Stored in state variables
-- Compared with \`==\`
-- Passed as function arguments
-- Validated for non-zero value
-
-\`\`\`python
-def transfer_admin(self, new_admin: Address) -> None:
-    if gl.message.sender_address != self.admin:
-        raise gl.vm.UserError("only admin can transfer")
-    self.admin = new_admin
-\`\`\`
-
-### Validating the New Address
-
-Always validate that the incoming address is meaningful. A zero address (\`0x0000...0000\`) typically means "no address" — assigning it would permanently lock the contract with no admin.
-
-\`\`\`python
-zero = Address("0x0000000000000000000000000000000000000000")
-if new_admin == zero:
-    raise gl.vm.UserError("cannot transfer to zero address")
-\`\`\`
-
-### Two-Step Transfers (Advanced)
-
-Production contracts often use a two-step pattern: the current admin proposes a new admin, and the new admin must accept. This prevents accidents where the admin is transferred to a typo'd address. For GovMind we keep it simple — one step — but be aware the two-step pattern exists.
-
-### Why This Matters for DAO Longevity
-
-DAOs are meant to outlast their founders. A transferable admin role is the minimum viable succession plan. Future lessons will replace this with a full multi-sig or proposal-based admin change.`,
+### What You'll Learn
+Build \`get_open_proposals_json()\` to show only proposals in "open" status.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address, u256, TreeMap, DynArray
-from dataclasses import dataclass
 
-@dataclass
-class Proposal:
-    title: str
-    proposer: Address
-    votes_for: int = 0
-    votes_against: int = 0
+import json
+from genlayer import *
 
-class GovernanceDAO(gl.Contract):
-    name: str
-    admin: Address
-    treasury: u256
-    member_count: int
-    proposal_count: int
-    members: TreeMap[Address, bool]
-    proposals: TreeMap[int, Proposal]
-    proposal_ids: DynArray[int]
 
-    def __init__(self, name: str) -> None:
-        self.name = name
-        self.admin = gl.message.sender_address
-        self.treasury = u256(0)
-        self.member_count = 0
-        self.proposal_count = 0
-        self.members = TreeMap[Address, bool]()
-        self.proposals = TreeMap[int, Proposal]()
-        self.proposal_ids = DynArray[int]()
+class GovMind(gl.Contract):
+    owner: Address
+    dao_name: str
+    dao_description: str
+
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.dao_name = "GovMind"
+        self.dao_description = "An AI-governed decentralised autonomous organisation."
 
     @gl.public.view
-    def get_name(self) -> str:
-        return self.name
+    def get_dao_name(self) -> str:
+        return self.dao_name
 
     @gl.public.view
-    def get_admin(self) -> str:
-        return str(self.admin)
+    def get_dao_description(self) -> str:
+        return self.dao_description
+
+    @gl.public.view
+    def get_owner(self) -> str:
+        return self.owner.as_hex
+
+    @gl.public.view
+    def get_contract_summary(self) -> str:
+        return self.dao_name + ": " + self.dao_description
 
     @gl.public.write
-    def transfer_admin(self, new_admin: Address) -> None:
-        # TODO: check caller is current admin
-        # TODO: raise UserError if new_admin is zero address
-        # TODO: assign self.admin = new_admin
-        pass`,
-  task: "Implement `transfer_admin()` so only the current admin can change the admin address, and raise an error if the new address is the zero address.",
+    def update_dao_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update"
+        assert len(new_description) > 0, "Description cannot be empty"
+        self.dao_description = new_description
+
+    proposal_count: u256
+    proposal_titles: TreeMap[str, str]
+    proposal_descriptions: TreeMap[str, str]
+    proposal_proposers: TreeMap[str, Address]
+    proposal_statuses: TreeMap[str, str]
+    members: TreeMap[str, bool]
+
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.dao_name = "GovMind"
+        self.dao_description = "An AI-governed decentralised autonomous organisation."
+        self.proposal_count = u256(0)
+        self.members[self.owner.as_hex] = True
+
+    @gl.public.write
+    def create_proposal(self, title: str, description: str) -> str:
+        assert self.members.get(gl.message.sender_address.as_hex, False), "Only members can propose"
+        assert len(title) > 0, "Title cannot be empty"
+        assert len(description) > 0, "Description cannot be empty"
+        proposal_id = str(self.proposal_count)
+        self.proposal_titles[proposal_id] = title
+        self.proposal_descriptions[proposal_id] = description
+        self.proposal_proposers[proposal_id] = gl.message.sender_address
+        self.proposal_statuses[proposal_id] = "open"
+        self.proposal_count = self.proposal_count + u256(1)
+        return proposal_id
+
+    proposal_ids: DynArray[str]
+
+    @gl.public.view
+    def get_proposal_json(self, proposal_id: str) -> str:
+        assert proposal_id in self.proposal_titles, "Proposal not found"
+        return json.dumps({
+            "id": proposal_id,
+            "title": self.proposal_titles[proposal_id],
+            "description": self.proposal_descriptions[proposal_id],
+            "proposer": self.proposal_proposers[proposal_id].as_hex,
+            "status": self.proposal_statuses[proposal_id],
+        }, sort_keys=True)
+
+    @gl.public.view
+    def get_open_proposals_json(self) -> str:
+        result = []
+        for pid in self.proposal_ids:
+            if self.proposal_statuses[pid] == "open":
+                result.append({"id": pid, "title": self.proposal_titles[pid]})
+        return json.dumps(result, sort_keys=True)
+
+
+`,
+  task: `Add \`get_open_proposals_json(self) -> str\` that loops \`proposal_ids\` and includes only those with status "open".`,
   hints: [
-    "First check: `if gl.message.sender_address != self.admin: raise gl.vm.UserError('not the admin')`.",
-    "Zero address check: `zero = Address('0x0000000000000000000000000000000000000000'); if new_admin == zero: raise gl.vm.UserError('zero address')`.",
-    "If both checks pass, simply assign: `self.admin = new_admin`.",
+    "Filter: if self.proposal_statuses[pid] == 'open':",
+    "Return json.dumps(result, sort_keys=True).",
+    "Key line: if self.proposal_statuses[pid] == 'open':",
   ],
 };
 

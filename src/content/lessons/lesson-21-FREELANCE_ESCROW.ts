@@ -3,96 +3,159 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 21,
   projectPath: "FREELANCE_ESCROW",
-  explanation: `## Lesson 21 — Payable Methods and Escrow Funding
+  explanation: `## Lesson 21 — AI Dispute Review Basics
 
-An escrow that never holds real money is just a spreadsheet. This lesson introduces **payable methods** — functions that accept GEN (GenLayer's native token) sent alongside the call.
+### What You'll Learn
+When a client disputes a delivery, AI can compare the job description against the delivery reference and recommend whether to release or refund.
 
-### Payable Decorator
-
-\`\`\`python
-@gl.public.write.payable
-def fund_escrow(self) -> None:
-    self.escrow_amount += gl.message.value
-\`\`\`
-
-\`gl.message.value\` is a \`u256\` representing the wei sent with this transaction. If no value is sent it is \`0\`.
-
-### Separate Funding from Deployment
-
-The constructor cannot easily be payable in all GenLayer setups, so a clean pattern is to deploy the contract first and then call \`fund_escrow()\` as a separate transaction. This also allows the client to top up the escrow later.
-
-### Tracking Escrow Amount
-
-Add \`escrow_amount: u256\` to state, initialised to \`0\`. Every call to \`fund_escrow\` adds the sent value:
-
-\`\`\`python
-def __init__(self, title: str, budget: u256) -> None:
-    ...
-    self.escrow_amount = u256(0)
-\`\`\`
-
-### Security Note
-
-Only allow the client to fund the escrow — otherwise a third party could send tokens and complicate the payout logic. Add an ownership check inside \`fund_escrow\`.`,
+### How It Works
+The AI prompt includes the job description, delivery reference, and dispute reason. The AI responds with a structured verdict.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address, u256, TreeMap
-from dataclasses import dataclass
 
-OPEN = "OPEN"
-AWARDED = "AWARDED"
-WORK_SUBMITTED = "WORK_SUBMITTED"
-COMPLETE = "COMPLETE"
-DISPUTED = "DISPUTED"
+import json
+from genlayer import *
 
 
-@dataclass
-class Application:
-    bio: str
-    portfolio_url: str
-    score: int = 0
+class TrustLance(gl.Contract):
+    owner: Address
+    platform_name: str
+    platform_description: str
 
-
-class FreelanceEscrow(gl.Contract):
-    title: str
-    client: Address
-    budget: u256
-    escrow_amount: u256
-    is_open: bool
-    status: str
-    applicant_count: int
-    applications: TreeMap[Address, Application]
-    awarded_to: Address
-    deliverable_url: str
-
-    def __init__(self, title: str, budget: u256) -> None:
-        self.title = title
-        self.client = gl.message.sender_address
-        self.budget = budget
-        self.escrow_amount = u256(0)
-        self.is_open = True
-        self.status = OPEN
-        self.applicant_count = 0
-        self.applications = TreeMap[Address, Application]()
-        self.deliverable_url = ""
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.platform_name = "TrustLance"
+        self.platform_description = "A GenLayer freelance escrow platform."
 
     @gl.public.view
-    def get_title(self) -> str:
-        return self.title
+    def get_platform_name(self) -> str:
+        return self.platform_name
 
     @gl.public.view
-    def get_escrow_amount(self) -> int:
-        return int(self.escrow_amount)
+    def get_platform_description(self) -> str:
+        return self.platform_description
+
+    @gl.public.view
+    def get_owner(self) -> str:
+        return self.owner.as_hex
+
+    @gl.public.view
+    def get_contract_summary(self) -> str:
+        return self.platform_name + ": " + self.platform_description
+
+    @gl.public.write
+    def update_platform_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update"
+        assert len(new_description) > 0, "Description cannot be empty"
+        self.platform_description = new_description
+
+    job_count: u256
+    job_titles: TreeMap[str, str]
+    job_descriptions: TreeMap[str, str]
+    job_clients: TreeMap[str, Address]
+    job_budgets: TreeMap[str, u256]
+    job_statuses: TreeMap[str, str]
+    job_freelancers: TreeMap[str, Address]
+
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.platform_name = "TrustLance"
+        self.platform_description = "A GenLayer freelance escrow platform."
+        self.job_count = u256(0)
+
+    @gl.public.write
+    def create_job(self, title: str, description: str, budget: u256) -> str:
+        assert len(title) > 0, "Title cannot be empty"
+        assert len(description) > 0, "Description cannot be empty"
+        assert budget > u256(0), "Budget must be greater than zero"
+
+        job_id = str(self.job_count)
+        self.job_titles[job_id] = title
+        self.job_descriptions[job_id] = description
+        self.job_clients[job_id] = gl.message.sender_address
+        self.job_budgets[job_id] = budget
+        self.job_statuses[job_id] = "open"
+        self.job_count = self.job_count + u256(1)
+        return job_id
+
+    job_ids: DynArray[str]
+
+    @gl.public.view
+    def get_job_json(self, job_id: str) -> str:
+        assert job_id in self.job_titles, "Job not found"
+        return json.dumps({
+            "id": job_id,
+            "title": self.job_titles[job_id],
+            "description": self.job_descriptions[job_id],
+            "client": self.job_clients[job_id].as_hex,
+            "budget": str(self.job_budgets[job_id]),
+            "status": self.job_statuses[job_id],
+        }, sort_keys=True)
+
+    @gl.public.view
+    def get_open_jobs_json(self) -> str:
+        result = []
+        for job_id in self.job_ids:
+            if self.job_statuses[job_id] == "open":
+                result.append({"id": job_id, "title": self.job_titles[job_id], "budget": str(self.job_budgets[job_id])})
+        return json.dumps(result, sort_keys=True)
+
+    @gl.public.view
+    def get_all_jobs_json(self) -> str:
+        result = []
+        for job_id in self.job_ids:
+            result.append({"id": job_id, "title": self.job_titles[job_id], "status": self.job_statuses[job_id]})
+        return json.dumps(result, sort_keys=True)
+
+    @gl.public.write
+    def close_job(self, job_id: str) -> None:
+        assert job_id in self.job_titles, "Job not found"
+        assert gl.message.sender_address == self.job_clients[job_id], "Only client can close"
+        assert self.job_statuses[job_id] == "open", "Only open jobs can be closed"
+        self.job_statuses[job_id] = "closed"
+
+    job_escrow: TreeMap[str, u256]
+    job_deliveries: TreeMap[str, str]
+    freelancer_claimed: TreeMap[str, bool]
 
     @gl.public.write.payable
-    def fund_escrow(self) -> None:
-        pass  # TODO: require caller == client; add gl.message.value to self.escrow_amount
+    def fund_job(self, job_id: str) -> None:
+        assert job_id in self.job_titles, "Job not found"
+        assert gl.message.sender_address == self.job_clients[job_id], "Only client can fund"
+        assert self.job_statuses[job_id] == "open", "Job must be open"
+        assert gl.message.value >= self.job_budgets[job_id], "Insufficient funds"
+        self.job_escrow[job_id] = gl.message.value
+        self.job_statuses[job_id] = "funded"
+
+    @gl.public.write
+    def accept_job(self, job_id: str) -> None:
+        assert job_id in self.job_titles, "Job not found"
+        assert self.job_statuses[job_id] == "funded", "Job must be funded"
+        self.job_freelancers[job_id] = gl.message.sender_address
+        self.job_statuses[job_id] = "accepted"
+
+    @gl.public.write
+    def submit_delivery(self, job_id: str, delivery_ref: str) -> None:
+        assert job_id in self.job_titles, "Job not found"
+        assert gl.message.sender_address == self.job_freelancers[job_id], "Only freelancer can submit"
+        assert self.job_statuses[job_id] == "accepted", "Job must be accepted"
+        self.job_deliveries[job_id] = delivery_ref
+        self.job_statuses[job_id] = "delivered"
+
+    @gl.public.write
+    def confirm_delivery(self, job_id: str) -> None:
+        assert job_id in self.job_titles, "Job not found"
+        assert gl.message.sender_address == self.job_clients[job_id], "Only client can confirm"
+        assert self.job_statuses[job_id] == "delivered", "Delivery must be submitted first"
+        assert not self.freelancer_claimed.get(job_id, False), "Already paid"
+        self.freelancer_claimed[job_id] = True
+        self.job_statuses[job_id] = "completed"
+        gl.message.recipient_address.transfer(self.job_escrow[job_id])
 `,
-  task: "Implement `fund_escrow()`: raise `gl.vm.UserError` if the caller is not the client, then add `gl.message.value` to `self.escrow_amount`.",
+  task: `Add \`get_dispute_prompt(self, job_id: str, reason: str) -> str\` as a \`@gl.public.view\` method. Return a prompt string that includes the job description, delivery reference, and reason.`,
   hints: [
-    "Ownership check first: `if gl.message.sender_address != self.client: raise gl.vm.UserError('only client can fund')`.",
-    "`gl.message.value` is the wei sent with the transaction — it is of type `u256`.",
-    "Add to escrow: `self.escrow_amount += gl.message.value`.",
+    "Build a multi-line f-string prompt combining the job fields.",
+    "Include description, delivery_ref, and the reason parameter.",
+    "Key line: `return f'Job: {self.job_descriptions[job_id]}/nDelivery: {delivery}/nReason: {reason}'`",
   ],
 };
 

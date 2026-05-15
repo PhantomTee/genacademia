@@ -3,118 +3,134 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 17,
   projectPath: "DAO",
-  explanation: `## Lesson 17 — Non-Comparative Validation
+  explanation: `## Lesson 17 — Preventing Duplicate Votes
 
-In Lesson 16 you wrote \`_validate_eval\` as a simple key-check. This lesson formalises the **non-comparative validation** principle, which is critical for safe non-deterministic contracts.
-
-### What is Non-Comparative Validation?
-
-When validators check a leader's result, they should verify **structural plausibility** — not independently reproduce the result. Re-running the LLM on every validator node would:
-1. Cost far more gas
-2. Potentially get different answers (LLMs are stochastic)
-3. Make consensus impossible
-
-The non-comparative approach says: "I don't need to re-run the computation. I just need to verify the result is structurally valid."
-
-### A Robust _validate_eval
-
-\`\`\`python
-def _validate_eval(self, result) -> bool:
-    if not isinstance(result, dict):
-        return False
-    if result.get("decision") not in ("APPROVE", "REJECT"):
-        return False
-    confidence = result.get("confidence", -1)
-    if not isinstance(confidence, int) or not (0 <= confidence <= 100):
-        return False
-    if "reasoning" not in result:
-        return False
-    return True
-\`\`\`
-
-### What This Checks
-
-- **Type check**: result is a dict (not a string, int, or None)
-- **Decision validity**: decision is exactly "APPROVE" or "REJECT"
-- **Confidence range**: an integer from 0 to 100 inclusive
-- **Required keys**: reasoning field exists
-
-### What This Does NOT Check
-
-The validator never asks "is this the right decision?" — that would require re-running the LLM. It only asks "is this a valid decision format?"
-
-This principle applies to any non-deterministic operation in GenLayer: validate structure, not semantics.`,
+### What You'll Learn
+The composite key \`proposal_id + "_" + voter_address\` prevents one address from voting twice on the same proposal.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address, u256, TreeMap, DynArray
-from dataclasses import dataclass
 
-PENDING = "PENDING"
-APPROVED = "APPROVED"
-REJECTED = "REJECTED"
-EXECUTED = "EXECUTED"
+import json
+from genlayer import *
 
-@dataclass
-class Proposal:
-    title: str
-    proposer: Address
-    votes_for: int = 0
-    votes_against: int = 0
-    status: str = "PENDING"
 
-class GovernanceDAO(gl.Contract):
-    name: str
-    admin: Address
-    treasury: u256
-    member_count: int
-    proposal_count: int
-    members: TreeMap[Address, bool]
-    proposals: TreeMap[int, Proposal]
-    proposal_ids: DynArray[int]
+class GovMind(gl.Contract):
+    owner: Address
+    dao_name: str
+    dao_description: str
 
-    def __init__(self, name: str) -> None:
-        self.name = name
-        self.admin = gl.message.sender_address
-        self.treasury = u256(0)
-        self.member_count = 0
-        self.proposal_count = 0
-        self.members = TreeMap[Address, bool]()
-        self.proposals = TreeMap[int, Proposal]()
-        self.proposal_ids = DynArray[int]()
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.dao_name = "GovMind"
+        self.dao_description = "An AI-governed decentralised autonomous organisation."
 
     @gl.public.view
-    def get_name(self) -> str:
-        return self.name
+    def get_dao_name(self) -> str:
+        return self.dao_name
 
-    def _leader_eval(self, title: str, ref_url: str) -> dict:
-        page = gl.nondet.web.get(ref_url)
-        prompt = f"""Evaluate this proposal for {self.name}.
-Title: {title}
-Reference: {page[:1500]}
-Return JSON with keys: decision (APPROVE/REJECT), reasoning (str), confidence (0-100 int)."""
-        return gl.nondet.exec_prompt(prompt, response_format="json")
+    @gl.public.view
+    def get_dao_description(self) -> str:
+        return self.dao_description
 
-    def _validate_eval(self, result) -> bool:
-        # TODO: check result is a dict
-        # TODO: check result["decision"] is "APPROVE" or "REJECT"
-        # TODO: check result["confidence"] is an int between 0 and 100
-        # TODO: check "reasoning" key exists
-        # TODO: return True only if all checks pass
-        pass
+    @gl.public.view
+    def get_owner(self) -> str:
+        return self.owner.as_hex
+
+    @gl.public.view
+    def get_contract_summary(self) -> str:
+        return self.dao_name + ": " + self.dao_description
 
     @gl.public.write
-    def ai_evaluate_proposal(self, title: str, ref_url: str) -> dict:
-        result = gl.vm.run_nondet_unsafe(
-            lambda: self._leader_eval(title, ref_url),
-            lambda r: self._validate_eval(r)
-        )
-        self.proposal_count += 1
-        return result`,
-  task: "Implement `_validate_eval()` to check non-comparatively: the result is a dict, `decision` is 'APPROVE' or 'REJECT', `confidence` is an integer 0–100, and `reasoning` key exists.",
+    def update_dao_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update"
+        assert len(new_description) > 0, "Description cannot be empty"
+        self.dao_description = new_description
+
+    proposal_count: u256
+    proposal_titles: TreeMap[str, str]
+    proposal_descriptions: TreeMap[str, str]
+    proposal_proposers: TreeMap[str, Address]
+    proposal_statuses: TreeMap[str, str]
+    members: TreeMap[str, bool]
+
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.dao_name = "GovMind"
+        self.dao_description = "An AI-governed decentralised autonomous organisation."
+        self.proposal_count = u256(0)
+        self.members[self.owner.as_hex] = True
+
+    @gl.public.write
+    def create_proposal(self, title: str, description: str) -> str:
+        assert self.members.get(gl.message.sender_address.as_hex, False), "Only members can propose"
+        assert len(title) > 0, "Title cannot be empty"
+        assert len(description) > 0, "Description cannot be empty"
+        proposal_id = str(self.proposal_count)
+        self.proposal_titles[proposal_id] = title
+        self.proposal_descriptions[proposal_id] = description
+        self.proposal_proposers[proposal_id] = gl.message.sender_address
+        self.proposal_statuses[proposal_id] = "open"
+        self.proposal_count = self.proposal_count + u256(1)
+        return proposal_id
+
+    proposal_ids: DynArray[str]
+
+    @gl.public.view
+    def get_proposal_json(self, proposal_id: str) -> str:
+        assert proposal_id in self.proposal_titles, "Proposal not found"
+        return json.dumps({
+            "id": proposal_id,
+            "title": self.proposal_titles[proposal_id],
+            "description": self.proposal_descriptions[proposal_id],
+            "proposer": self.proposal_proposers[proposal_id].as_hex,
+            "status": self.proposal_statuses[proposal_id],
+        }, sort_keys=True)
+
+    @gl.public.view
+    def get_open_proposals_json(self) -> str:
+        result = []
+        for pid in self.proposal_ids:
+            if self.proposal_statuses[pid] == "open":
+                result.append({"id": pid, "title": self.proposal_titles[pid]})
+        return json.dumps(result, sort_keys=True)
+
+    @gl.public.view
+    def get_all_proposals_json(self) -> str:
+        result = []
+        for pid in self.proposal_ids:
+            result.append({"id": pid, "title": self.proposal_titles[pid], "status": self.proposal_statuses[pid]})
+        return json.dumps(result, sort_keys=True)
+
+    @gl.public.write
+    def close_proposal(self, proposal_id: str) -> None:
+        assert proposal_id in self.proposal_titles, "Proposal not found"
+        assert gl.message.sender_address == self.owner, "Only owner can close"
+        assert self.proposal_statuses[proposal_id] == "open", "Only open proposals can be closed"
+        self.proposal_statuses[proposal_id] = "closed"
+
+    for_votes: TreeMap[str, u256]
+    against_votes: TreeMap[str, u256]
+    has_voted: TreeMap[str, bool]
+
+    @gl.public.write
+    def vote(self, proposal_id: str, support: bool) -> None:
+        assert proposal_id in self.proposal_titles, "Proposal not found"
+        voter_key = proposal_id + "_" + gl.message.sender_address.as_hex
+        assert not self.has_voted.get(voter_key, False), "Already voted"
+        assert self.members.get(gl.message.sender_address.as_hex, False), "Only members can vote"
+        assert self.proposal_statuses[proposal_id] == "open", "Proposal must be open"
+        self.has_voted[voter_key] = True
+        if support:
+            self.for_votes[proposal_id] = self.for_votes.get(proposal_id, u256(0)) + u256(1)
+        else:
+            self.against_votes[proposal_id] = self.against_votes.get(proposal_id, u256(0)) + u256(1)
+
+
+`,
+  task: `Add an assert at the top of \`vote()\`: \`assert not self.has_voted.get(voter_key, False), "Already voted"\`. Set \`self.has_voted[voter_key] = True\` before incrementing.`,
   hints: [
-    "Start with a type check: `if not isinstance(result, dict): return False`.",
-    "Check decision: `if result.get('decision') not in ('APPROVE', 'REJECT'): return False`.",
-    "Check confidence: `c = result.get('confidence', -1); if not isinstance(c, int) or not (0 <= c <= 100): return False` — then check reasoning and `return True`.",
+    "Build voter_key first, then check has_voted.",
+    "Set has_voted[voter_key] = True before updating counts.",
+    "Key line: `assert not self.has_voted.get(voter_key, False), 'Already voted'`",
   ],
 };
 

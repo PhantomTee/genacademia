@@ -3,123 +3,110 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 14,
   projectPath: "DAO",
-  explanation: `## Lesson 14 — State Machines: Proposal Lifecycle
+  explanation: `## Lesson 14 — Proposal Status Flow
 
-Real governance proposals don't jump from "submitted" to "executed" in one step. They move through a defined sequence of states. This lesson introduces the **state machine** pattern, which enforces that each transition is valid before it happens.
-
-### States and Transitions
-
-GovMind proposals follow this lifecycle:
-
-\`\`\`
-PENDING → APPROVED | REJECTED → EXECUTED
-\`\`\`
-
-Define states as string constants at module level — they read clearly in code and are readable on-chain:
-
-\`\`\`python
-PENDING = "PENDING"
-APPROVED = "APPROVED"
-REJECTED = "REJECTED"
-EXECUTED = "EXECUTED"
-\`\`\`
-
-### finalize_proposal
-
-After a vote ends, \`finalize_proposal\` checks the tally and transitions to APPROVED or REJECTED. It must verify the proposal is still PENDING — you cannot finalise an already-finalised proposal.
-
-\`\`\`python
-if proposal.status != PENDING:
-    raise gl.vm.UserError("already finalised")
-proposal.status = APPROVED if proposal.votes_for > proposal.votes_against else REJECTED
-\`\`\`
-
-### execute_proposal
-
-Execution is the final step. Only APPROVED proposals can be executed. Once executed, the status becomes EXECUTED and the action (sending funds, calling a sub-contract) is performed.
-
-### Why State Machines?
-
-Without explicit status checks, a bug could allow a proposal to be executed twice or allow a rejected proposal to sneak through. State machines make impossible states unrepresentable — if the check fails, the transaction reverts cleanly.
-
-Add \`status: str = "PENDING"\` to the \`Proposal\` dataclass to initialise every new proposal in the correct starting state.`,
+### What You'll Learn
+Model proposal states: open → passed/rejected/closed. Add \`close_proposal()\` for the owner.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address, u256, TreeMap, DynArray
-from dataclasses import dataclass
 
-PENDING = "PENDING"
-APPROVED = "APPROVED"
-REJECTED = "REJECTED"
-EXECUTED = "EXECUTED"
+import json
+from genlayer import *
 
-@dataclass
-class Proposal:
-    title: str
-    proposer: Address
-    votes_for: int = 0
-    votes_against: int = 0
-    status: str = "PENDING"
 
-class GovernanceDAO(gl.Contract):
-    name: str
-    admin: Address
-    treasury: u256
-    member_count: int
-    proposal_count: int
-    members: TreeMap[Address, bool]
-    proposals: TreeMap[int, Proposal]
-    proposal_ids: DynArray[int]
+class GovMind(gl.Contract):
+    owner: Address
+    dao_name: str
+    dao_description: str
 
-    def __init__(self, name: str) -> None:
-        self.name = name
-        self.admin = gl.message.sender_address
-        self.treasury = u256(0)
-        self.member_count = 0
-        self.proposal_count = 0
-        self.members = TreeMap[Address, bool]()
-        self.proposals = TreeMap[int, Proposal]()
-        self.proposal_ids = DynArray[int]()
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.dao_name = "GovMind"
+        self.dao_description = "An AI-governed decentralised autonomous organisation."
 
     @gl.public.view
-    def get_name(self) -> str:
-        return self.name
+    def get_dao_name(self) -> str:
+        return self.dao_name
+
+    @gl.public.view
+    def get_dao_description(self) -> str:
+        return self.dao_description
+
+    @gl.public.view
+    def get_owner(self) -> str:
+        return self.owner.as_hex
+
+    @gl.public.view
+    def get_contract_summary(self) -> str:
+        return self.dao_name + ": " + self.dao_description
 
     @gl.public.write
-    def submit_proposal(self, title: str) -> int:
-        pid = self.proposal_count
-        self.proposals[pid] = Proposal(title=title, proposer=gl.message.sender_address)
-        self.proposal_ids.append(pid)
-        self.proposal_count += 1
-        return pid
+    def update_dao_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update"
+        assert len(new_description) > 0, "Description cannot be empty"
+        self.dao_description = new_description
+
+    proposal_count: u256
+    proposal_titles: TreeMap[str, str]
+    proposal_descriptions: TreeMap[str, str]
+    proposal_proposers: TreeMap[str, Address]
+    proposal_statuses: TreeMap[str, str]
+    members: TreeMap[str, bool]
+
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.dao_name = "GovMind"
+        self.dao_description = "An AI-governed decentralised autonomous organisation."
+        self.proposal_count = u256(0)
+        self.members[self.owner.as_hex] = True
 
     @gl.public.write
-    def vote(self, pid: int, approve: bool) -> None:
-        p = self.proposals[pid]
-        if approve:
-            p.votes_for += 1
-        else:
-            p.votes_against += 1
-        self.proposals[pid] = p
+    def create_proposal(self, title: str, description: str) -> str:
+        assert self.members.get(gl.message.sender_address.as_hex, False), "Only members can propose"
+        assert len(title) > 0, "Title cannot be empty"
+        assert len(description) > 0, "Description cannot be empty"
+        proposal_id = str(self.proposal_count)
+        self.proposal_titles[proposal_id] = title
+        self.proposal_descriptions[proposal_id] = description
+        self.proposal_proposers[proposal_id] = gl.message.sender_address
+        self.proposal_statuses[proposal_id] = "open"
+        self.proposal_count = self.proposal_count + u256(1)
+        return proposal_id
 
-    @gl.public.write
-    def finalize_proposal(self, pid: int) -> None:
-        # TODO: get the proposal, raise if not PENDING
-        # TODO: set status to APPROVED or REJECTED based on vote tally
-        # TODO: save updated proposal back to self.proposals
-        pass
+    proposal_ids: DynArray[str]
 
-    @gl.public.write
-    def execute_proposal(self, pid: int) -> None:
-        # TODO: get the proposal, raise if not APPROVED
-        # TODO: set status to EXECUTED
-        # TODO: save updated proposal back
-        pass`,
-  task: "Implement `finalize_proposal()` to transition PENDING proposals to APPROVED or REJECTED based on votes, and `execute_proposal()` to transition APPROVED proposals to EXECUTED.",
+    @gl.public.view
+    def get_proposal_json(self, proposal_id: str) -> str:
+        assert proposal_id in self.proposal_titles, "Proposal not found"
+        return json.dumps({
+            "id": proposal_id,
+            "title": self.proposal_titles[proposal_id],
+            "description": self.proposal_descriptions[proposal_id],
+            "proposer": self.proposal_proposers[proposal_id].as_hex,
+            "status": self.proposal_statuses[proposal_id],
+        }, sort_keys=True)
+
+    @gl.public.view
+    def get_open_proposals_json(self) -> str:
+        result = []
+        for pid in self.proposal_ids:
+            if self.proposal_statuses[pid] == "open":
+                result.append({"id": pid, "title": self.proposal_titles[pid]})
+        return json.dumps(result, sort_keys=True)
+
+    @gl.public.view
+    def get_all_proposals_json(self) -> str:
+        result = []
+        for pid in self.proposal_ids:
+            result.append({"id": pid, "title": self.proposal_titles[pid], "status": self.proposal_statuses[pid]})
+        return json.dumps(result, sort_keys=True)
+
+
+`,
+  task: `Add \`close_proposal(self, proposal_id: str)\` with \`@gl.public.write\`. Owner only, proposal must be "open".`,
   hints: [
-    "In `finalize_proposal`: `p = self.proposals[pid]; if p.status != PENDING: raise gl.vm.UserError('not pending')`.",
-    "Decide outcome: `p.status = APPROVED if p.votes_for > p.votes_against else REJECTED` — then `self.proposals[pid] = p`.",
-    "In `execute_proposal`: check `p.status != APPROVED` and raise, then set `p.status = EXECUTED` and save.",
+    "Check sender == self.owner and status == open.",
+    "Set status to 'closed'.",
+    "Key line: `self.proposal_statuses[proposal_id] = 'closed'`",
   ],
 };
 

@@ -3,96 +3,61 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 6,
   projectPath: "FREELANCE_ESCROW",
-  explanation: `## Lesson 6 — AI Evaluation with exec_prompt
+  explanation: `## Lesson 6 — Job Storage Fields
 
-GenLayer's killer feature is **non-deterministic execution**: contracts can call an LLM during a transaction, with the network reaching consensus on the result. The entry point is \`gl.nondet.exec_prompt\`.
-
-### Calling the LLM
-
-\`\`\`python
-result = gl.nondet.exec_prompt(
-    "Does this portfolio suit a web development job? Answer HIRE or PASS only.",
-    response_format="text"
-)
-return result.strip().upper()
-\`\`\`
-
-The prompt is a plain string. \`response_format="text"\` asks for a freeform string back.
-
-### How Consensus Works
-
-Every validator node re-runs the prompt independently. GenLayer's consensus protocol ensures that even though LLM outputs are probabilistic, all nodes converge on the same final state. You don't need to manage this — the VM handles it.
-
-### Building the Evaluator
-
-\`evaluate_applicant(self, applicant: Address, portfolio_url: str) -> str\` should:
-
-1. Build a prompt that includes the job title and portfolio URL.
-2. Ask the LLM: does this freelancer fit?
-3. Return "HIRE" or "PASS".
-
-Keep the prompt focused and specific — vague prompts get inconsistent answers. Instruct the LLM to reply with exactly one word.
-
-### Adding \`awarded_to\`
-
-Add \`awarded_to: Address\` to state now. It will be set later when a freelancer is actually hired (Lesson 10), but declaring it early keeps the contract's shape clear.`,
+### What You'll Learn
+Add \`job_count: u256\` — a persistent counter for job IDs. Every new job gets a unique ID derived from this counter.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address, u256
+
+import json
+from genlayer import *
 
 
-class FreelanceEscrow(gl.Contract):
-    title: str
-    client: Address
-    budget: u256
-    is_open: bool
-    applicant_count: int
-    last_applicant: Address
-    awarded_to: Address
+class TrustLance(gl.Contract):
+    owner: Address
+    platform_name: str
+    platform_description: str
 
-    def __init__(self, title: str, budget: u256) -> None:
-        self.title = title
-        self.client = gl.message.sender_address
-        self.budget = budget
-        self.is_open = True
-        self.applicant_count = 0
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.platform_name = "TrustLance"
+        self.platform_description = "A GenLayer freelance escrow platform."
 
     @gl.public.view
-    def get_title(self) -> str:
-        return self.title
+    def get_platform_name(self) -> str:
+        return self.platform_name
 
     @gl.public.view
-    def get_is_open(self) -> bool:
-        return self.is_open
-
-    @gl.public.write
-    def close_applications(self) -> None:
-        if gl.message.sender_address != self.client:
-            raise gl.vm.UserError("only the client can close applications")
-        self.is_open = False
-
-    @gl.public.write
-    def apply(self, bio: str) -> None:
-        if not bio:
-            raise gl.vm.UserError("bio required")
-        if self.last_applicant == gl.message.sender_address:
-            raise gl.vm.UserError("already applied")
-        self.applicant_count += 1
-        self.last_applicant = gl.message.sender_address
+    def get_platform_description(self) -> str:
+        return self.platform_description
 
     @gl.public.view
-    def get_applicant_count(self) -> int:
-        return self.applicant_count
+    def get_owner(self) -> str:
+        return self.owner.as_hex
+
+    @gl.public.view
+    def get_contract_summary(self) -> str:
+        return self.platform_name + ": " + self.platform_description
 
     @gl.public.write
-    def evaluate_applicant(self, applicant: Address, portfolio_url: str) -> str:
-        pass  # TODO: call gl.nondet.exec_prompt asking if portfolio fits the job title; return "HIRE" or "PASS"
+    def update_platform_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update"
+        assert len(new_description) > 0, "Description cannot be empty"
+        self.platform_description = new_description
+
+    job_count: u256
+
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.platform_name = "TrustLance"
+        self.platform_description = "A GenLayer freelance escrow platform."
+        self.job_count = u256(0)
 `,
-  task: "Implement `evaluate_applicant()` to call `gl.nondet.exec_prompt` with a prompt that mentions `self.title` and `portfolio_url`, instructing the LLM to reply with HIRE or PASS. Return the stripped, uppercased result.",
+  task: `Initialize \`job_count\` to \`u256(0)\` in the constructor. Add a \`@gl.public.view\` method \`get_job_count()\` that returns it as a string.`,
   hints: [
-    "`gl.nondet.exec_prompt(prompt, response_format='text')` calls the LLM and returns a string.",
-    "Build a clear prompt: `f'Job: {self.title}\\nPortfolio: {portfolio_url}\\nReply HIRE or PASS only.'`",
-    "Return `result.strip().upper()` to normalise the LLM's response.",
+    "Declare job_count: u256 at class level and initialize with u256(0).",
+    "Return str(self.job_count) so the JSON frontend can read it.",
+    "Key line: `return str(self.job_count)`",
   ],
 };
 

@@ -3,129 +3,25 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 14,
   projectPath: "PREDICTION_MARKET",
-  explanation: `## Lesson 14 — Status State Machines: Lifecycle Transitions
+  explanation: `## Lesson 14 — Market Status Flow
 
-Markets follow a lifecycle: \`"active"\` → \`"closed"\` → \`"resolved"\`. Each transition has rules — you can't skip steps or go backwards.
+### What You'll Learn
 
-\`close_market\` moves a market from \`"active"\` to \`"closed"\`. Two roles can trigger this: the market creator or the contract owner. Multiple-condition auth checks use \`or\`:
-
-\`\`\`python
-caller = gl.message.sender_address
-creator = self.market_creators[market_id]
-assert caller == creator or caller == self.owner, "Only creator or owner can close market"
-\`\`\`
-
-The full set of assertions for a transition:
-1. Market must exist
-2. Caller must be authorized
-3. Market must be in the required starting state
-4. Then update the state
-
-Enforcing these rules prevents invalid transitions and protects the integrity of the market lifecycle.`,
+Students learn how to model a lifecycle using status strings.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
-import json
 from genlayer import *
 
-
-class PredictX(gl.Contract):
-    owner: Address
-    platform_name: str
-    platform_description: str
-
-    market_questions: TreeMap[str, str]
-    market_outcome_a: TreeMap[str, str]
-    market_outcome_b: TreeMap[str, str]
-    market_creators: TreeMap[str, Address]
-    market_min_stakes: TreeMap[str, u256]
-    market_statuses: TreeMap[str, str]
-    market_count: u256
-    market_ids: DynArray[str]
-
-    def __init__(self) -> None:
-        self.owner = gl.message.sender_address
-        self.platform_name = "PredictX"
-        self.platform_description = "A GenLayer prediction market that uses AI-assisted resolution."
-        self.market_count = u256(0)
-
-    @gl.public.view
-    def get_platform_name(self) -> str:
-        return self.platform_name
-
-    @gl.public.view
-    def get_platform_description(self) -> str:
-        return self.platform_description
-
-    @gl.public.view
-    def get_owner(self) -> str:
-        return self.owner.as_hex
-
-    @gl.public.view
-    def get_contract_summary(self) -> str:
-        return self.platform_name + ": " + self.platform_description
-
-    @gl.public.write
-    def update_platform_description(self, new_description: str) -> None:
-        assert gl.message.sender_address == self.owner, "Only owner can update description"
-        assert len(new_description) > 0, "Description cannot be empty"
-        self.platform_description = new_description
-
-    @gl.public.write
-    def create_market(self, question: str, outcome_a: str, outcome_b: str, min_stake: u256) -> str:
-        assert len(question) > 0, "Question cannot be empty"
-        assert len(outcome_a) > 0, "Outcome A cannot be empty"
-        assert len(outcome_b) > 0, "Outcome B cannot be empty"
-        assert outcome_a != outcome_b, "Outcomes must be different"
-        assert min_stake > u256(0), "Minimum stake must be greater than zero"
-
-        market_id = str(self.market_count)
-
-        self.market_creators[market_id] = gl.message.sender_address
-        self.market_questions[market_id] = question
-        self.market_outcome_a[market_id] = outcome_a
-        self.market_outcome_b[market_id] = outcome_b
-        self.market_min_stakes[market_id] = min_stake
-        self.market_statuses[market_id] = "active"
-
-        self.market_count += u256(1)
-        self.market_ids.append(market_id)
-
-        return market_id
-
-    @gl.public.view
-    def get_market_json(self, market_id: str) -> str:
-        assert market_id in self.market_questions, "Market not found"
-        return json.dumps({
-            "id": market_id,
-            "creator": self.market_creators[market_id].as_hex,
-            "question": self.market_questions[market_id],
-            "outcome_a": self.market_outcome_a[market_id],
-            "outcome_b": self.market_outcome_b[market_id],
-            "min_stake": str(self.market_min_stakes[market_id]),
-            "status": self.market_statuses[market_id],
-        }, sort_keys=True)
-
-    @gl.public.view
-    def get_active_markets_json(self) -> str:
-        result = []
-        for market_id in self.market_ids:
-            if self.market_statuses[market_id] == "active":
-                result.append({
-                    "id": market_id,
-                    "creator": self.market_creators[market_id].as_hex,
-                    "question": self.market_questions[market_id],
-                    "outcome_a": self.market_outcome_a[market_id],
-                    "outcome_b": self.market_outcome_b[market_id],
-                    "min_stake": str(self.market_min_stakes[market_id]),
-                    "status": self.market_statuses[market_id],
-                })
-        return json.dumps(result, sort_keys=True)
+# Continue building your contract — add the method described in the task
 `,
-  task: "Add `close_market(self, market_id: str) -> None` with `@gl.public.write`. It must assert the market exists, assert the caller is the creator or owner, assert the status is `\"active\"`, then set status to `\"closed\"`.",
+  task: `Add:
+
+close_market(market_id: str)
+Only the creator or owner can close a market.`,
   hints: [
-    "Use `caller = gl.message.sender_address` and `creator = self.market_creators[market_id]`.",
-    "The auth check: `assert caller == creator or caller == self.owner, \"Only creator or owner can close market\"`",
-    "Set `self.market_statuses[market_id] = \"closed\"` only after all assertions pass.",
+    "Add:.",
+    "close_market(market_id: str)",
+    "Key line: `def close_market(self, market_id: str) -> None:`",
   ],
 };
 

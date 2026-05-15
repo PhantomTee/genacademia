@@ -3,93 +3,52 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 5,
   projectPath: "FREELANCE_ESCROW",
-  explanation: `## Lesson 5 — Capstone: Ownership and Access Control
+  explanation: `## Lesson 5 — Major Upgrade: Freelance Platform Identity Contract
 
-This first capstone pulls together everything from Lessons 1–4 into a complete job-registration contract. The key new concept is **ownership-gated actions**: only the client who deployed the contract should be able to close applications.
+### What You'll Learn
+Combine everything from lessons 1-4 into a complete identity contract: owner, platform metadata, view methods, write methods, and a summary getter.
 
-### Ownership Pattern
-
-Compare the caller to the stored owner:
-
-\`\`\`python
-@gl.public.write
-def close_applications(self) -> None:
-    if gl.message.sender_address != self.client:
-        raise gl.vm.UserError("only the client can close applications")
-    self.is_open = False
-\`\`\`
-
-This pattern appears in almost every serious smart contract. It is the on-chain equivalent of an admin permission check.
-
-### Boolean State Flag
-
-\`is_open: bool\` acts as a gate that other methods can check. After the client calls \`close_applications()\`, the contract can optionally reject new \`apply()\` calls (that guard will be added implicitly by checking \`self.is_open\` first).
-
-### Capstone Contract Features
-
-After this lesson TrustLance has:
-
-- A typed \`client: Address\` set at deploy time
-- A \`budget: u256\` advertised in the job posting
-- Validated \`apply()\` (no blank bios, no duplicates)
-- \`close_applications()\` gated to the client only
-- \`get_is_open()\` view for the frontend
-
-This is a production-quality registration contract — simple but safe.`,
+### How It Works
+A capstone lesson assembles all concepts learned so far. Add \`get_contract_summary()\` to combine name and description in one call.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address, u256
+
+import json
+from genlayer import *
 
 
-class FreelanceEscrow(gl.Contract):
-    title: str
-    client: Address
-    budget: u256
-    is_open: bool
-    applicant_count: int
-    last_applicant: Address
+class TrustLance(gl.Contract):
+    owner: Address
+    platform_name: str
+    platform_description: str
 
-    def __init__(self, title: str, budget: u256) -> None:
-        self.title = title
-        self.client = gl.message.sender_address
-        self.budget = budget
-        self.is_open = True
-        self.applicant_count = 0
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.platform_name = "TrustLance"
+        self.platform_description = "A GenLayer freelance escrow platform."
 
     @gl.public.view
-    def get_title(self) -> str:
-        return self.title
+    def get_platform_name(self) -> str:
+        return self.platform_name
 
     @gl.public.view
-    def get_client(self) -> str:
-        return str(self.client)
+    def get_platform_description(self) -> str:
+        return self.platform_description
 
     @gl.public.view
-    def get_is_open(self) -> bool:
-        pass  # TODO: return self.is_open
+    def get_owner(self) -> str:
+        return self.owner.as_hex
 
     @gl.public.write
-    def close_applications(self) -> None:
-        pass  # TODO: require caller == client, then set is_open = False
-
-    @gl.public.write
-    def apply(self, bio: str) -> None:
-        if not bio:
-            raise gl.vm.UserError("bio required")
-        if self.last_applicant == gl.message.sender_address:
-            raise gl.vm.UserError("already applied")
-        self.applicant_count += 1
-        self.last_applicant = gl.message.sender_address
-
-    @gl.public.view
-    def get_applicant_count(self) -> int:
-        return self.applicant_count
+    def update_platform_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update"
+        assert len(new_description) > 0, "Description cannot be empty"
+        self.platform_description = new_description
 `,
-  task: "Implement `close_applications()` to raise `gl.vm.UserError` if the caller is not the client, then set `self.is_open = False`. Implement `get_is_open()` to return the boolean flag.",
+  task: `Add \`get_contract_summary(self) -> str\` that returns the platform name and description joined with ": ".`,
   hints: [
-    "Compare `gl.message.sender_address != self.client` to check for unauthorised callers.",
-    "Raise `gl.vm.UserError('only the client can close applications')` before changing any state.",
-    "After the ownership check, `self.is_open = False` completes the method. `get_is_open` just returns `self.is_open`.",
+    "Concatenate platform_name and platform_description with a separator.",
+    "Use the + operator to join strings.",
+    "Key line: `return self.platform_name + ': ' + self.platform_description`",
   ],
 };
 

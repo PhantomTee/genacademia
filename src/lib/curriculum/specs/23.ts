@@ -2,11 +2,11 @@ import type { LessonSpecs } from "./index";
 
 export const specs: LessonSpecs = {
   PREDICTION_MARKET: {
-    method: "get_question",
+    method: "get_platform_name",
     args: [],
     expectedShape: "nonEmpty",
     staticChecks: {
-      requiredClass: "PredictionMarket",
+      requiredClass: "PredictX",
       requiredConcepts: ["VectorStorage"],
     },
   },
@@ -38,11 +38,11 @@ export const specs: LessonSpecs = {
     },
   },
   INSURANCE: {
-    method: "get_pool_name",
+    method: "get_court_name",
     args: [],
     expectedShape: "nonEmpty",
     staticChecks: {
-      requiredClass: "InsurancePool",
+      requiredClass: "CaseWise",
       requiredConcepts: ["VectorStorage"],
     },
   },

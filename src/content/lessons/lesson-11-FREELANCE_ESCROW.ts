@@ -3,99 +3,84 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 11,
   projectPath: "FREELANCE_ESCROW",
-  explanation: `## Lesson 11 — TreeMap: Per-Applicant Storage
+  explanation: `## Lesson 11 — Job Indexing with DynArray
 
-The \`last_applicant\` field only remembers *one* freelancer. To track every applicant we need a mapping from address to data — a \`TreeMap\`.
-
-### TreeMap Basics
-
-\`\`\`python
-from genlayer.types import TreeMap
-
-class FreelanceEscrow(gl.Contract):
-    applications: TreeMap[Address, str]
-
-    def __init__(self, title: str, budget: u256) -> None:
-        ...
-        self.applications = TreeMap[Address, str]()
-\`\`\`
-
-The type parameters mirror a typed dictionary: keys are \`Address\`, values are \`str\` (the bio for now).
-
-### Writing and Reading
-
-\`\`\`python
-# Write
-self.applications[gl.message.sender_address] = bio
-
-# Read (safe — returns default if missing)
-bio = self.applications.get(addr, "")
-
-# Read (raises KeyError if missing)
-bio = self.applications[addr]
-\`\`\`
-
-### Duplicate Detection with TreeMap
-
-Now that every applicant is stored by address, duplicate detection becomes reliable: check whether the address key already exists before writing.
-
-\`\`\`python
-if self.applications.get(gl.message.sender_address, "") != "":
-    raise gl.vm.UserError("already applied")
-\`\`\`
-
-### Adding get_application
-
-A new view method \`get_application(self, applicant: Address) -> str\` lets the client read any applicant's bio on demand, removing the need for the old \`last_applicant\` field entirely.`,
+### What You'll Learn
+Add \`job_ids: DynArray[str]\` so the frontend can enumerate all jobs in order.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address, u256, TreeMap
+
+import json
+from genlayer import *
 
 
-class FreelanceEscrow(gl.Contract):
-    title: str
-    client: Address
-    budget: u256
-    is_open: bool
-    status: str
-    applicant_count: int
-    applications: TreeMap[Address, str]
-    awarded_to: Address
+class TrustLance(gl.Contract):
+    owner: Address
+    platform_name: str
+    platform_description: str
 
-    def __init__(self, title: str, budget: u256) -> None:
-        self.title = title
-        self.client = gl.message.sender_address
-        self.budget = budget
-        self.is_open = True
-        self.status = "OPEN"
-        self.applicant_count = 0
-        self.applications = TreeMap[Address, str]()  # TODO: ensure this is initialised
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.platform_name = "TrustLance"
+        self.platform_description = "A GenLayer freelance escrow platform."
 
     @gl.public.view
-    def get_title(self) -> str:
-        return self.title
+    def get_platform_name(self) -> str:
+        return self.platform_name
+
+    @gl.public.view
+    def get_platform_description(self) -> str:
+        return self.platform_description
+
+    @gl.public.view
+    def get_owner(self) -> str:
+        return self.owner.as_hex
+
+    @gl.public.view
+    def get_contract_summary(self) -> str:
+        return self.platform_name + ": " + self.platform_description
 
     @gl.public.write
-    def apply(self, bio: str) -> None:
-        if not bio:
-            raise gl.vm.UserError("bio required")
-        # TODO: replace old last_applicant duplicate check with TreeMap lookup
-        # TODO: store bio in self.applications keyed by sender
-        self.applicant_count += 1
+    def update_platform_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update"
+        assert len(new_description) > 0, "Description cannot be empty"
+        self.platform_description = new_description
 
-    @gl.public.view
-    def get_applicant_count(self) -> int:
-        return self.applicant_count
+    job_count: u256
+    job_titles: TreeMap[str, str]
+    job_descriptions: TreeMap[str, str]
+    job_clients: TreeMap[str, Address]
+    job_budgets: TreeMap[str, u256]
+    job_statuses: TreeMap[str, str]
+    job_freelancers: TreeMap[str, Address]
 
-    @gl.public.view
-    def get_application(self, applicant: Address) -> str:
-        pass  # TODO: return bio from self.applications, or "" if not found
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.platform_name = "TrustLance"
+        self.platform_description = "A GenLayer freelance escrow platform."
+        self.job_count = u256(0)
+
+    @gl.public.write
+    def create_job(self, title: str, description: str, budget: u256) -> str:
+        assert len(title) > 0, "Title cannot be empty"
+        assert len(description) > 0, "Description cannot be empty"
+        assert budget > u256(0), "Budget must be greater than zero"
+
+        job_id = str(self.job_count)
+        self.job_titles[job_id] = title
+        self.job_descriptions[job_id] = description
+        self.job_clients[job_id] = gl.message.sender_address
+        self.job_budgets[job_id] = budget
+        self.job_statuses[job_id] = "open"
+        self.job_count = self.job_count + u256(1)
+        return job_id
+
+    job_ids: DynArray[str]
 `,
-  task: "Initialise `self.applications = TreeMap[Address, str]()` in `__init__`. Update `apply()` to check for duplicates via the TreeMap and store the bio. Implement `get_application()` to safely retrieve a bio.",
+  task: `Add \`job_ids: DynArray[str]\` at class level. In \`create_job\`, call \`self.job_ids.append(job_id)\` after assigning all other fields.`,
   hints: [
-    "Check duplicates: `if self.applications.get(gl.message.sender_address, '') != '': raise gl.vm.UserError('already applied')`.",
-    "Store the bio: `self.applications[gl.message.sender_address] = bio`.",
-    "`get_application` returns `self.applications.get(applicant, '')` to avoid KeyError.",
+    "Declare job_ids: DynArray[str] at class level.",
+    "Append the new job ID after all TreeMap assignments.",
+    "Key line: `self.job_ids.append(job_id)`",
   ],
 };
 

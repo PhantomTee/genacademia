@@ -3,92 +3,134 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 18,
   projectPath: "DAO",
-  explanation: `## Lesson 18 — Visual Content with web.render
+  explanation: `## Lesson 18 — Counting Votes
 
-Governance proposals often include visual evidence: screenshots of a project's UI, graphs, or design mockups. GenLayer's \`gl.nondet.web.render(url)\` renders a full web page and returns the result as \`bytes\` — a screenshot image.
-
-### gl.nondet.web.render
-
-\`\`\`python
-screenshot: bytes = gl.nondet.web.render("https://example.com/project")
-\`\`\`
-
-Like \`web.get\`, \`web.render\` is non-deterministic and participates in consensus. The leader renders the page; validators check the result. The return value is raw image bytes (typically PNG).
-
-### When to Use web.render vs web.get
-
-| Scenario | Use |
-|----------|-----|
-| Fetch text, HTML, JSON | \`web.get\` |
-| Capture visual state of a page | \`web.render\` |
-| Pass to LLM for image analysis | \`web.render\` |
-
-### get_proposal_screenshot
-
-This lesson adds a standalone view that wraps \`web.render\`:
-
-\`\`\`python
-@gl.public.write
-def get_proposal_screenshot(self, url: str) -> bytes:
-    return gl.nondet.web.render(url)
-\`\`\`
-
-Note: even though this is "just reading" a web page, it uses \`@gl.public.write\` because non-deterministic operations require a transaction (they must go through consensus). You cannot call \`web.render\` from a \`@gl.public.view\` method.
-
-### Usage in the DAO
-
-Proposal submitters can link to a live preview of their project. The DAO's admin or AI evaluator can screenshot the URL to get a visual snapshot of the project's current state, providing richer context than text alone.`,
+### What You'll Learn
+Track \`for_votes\` and \`against_votes\` per proposal as \`u256\` counters. Add a view to read the tally.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address, u256, TreeMap, DynArray
-from dataclasses import dataclass
 
-PENDING = "PENDING"
-APPROVED = "APPROVED"
-REJECTED = "REJECTED"
-EXECUTED = "EXECUTED"
+import json
+from genlayer import *
 
-@dataclass
-class Proposal:
-    title: str
-    proposer: Address
-    votes_for: int = 0
-    votes_against: int = 0
-    status: str = "PENDING"
 
-class GovernanceDAO(gl.Contract):
-    name: str
-    admin: Address
-    treasury: u256
-    member_count: int
-    proposal_count: int
-    members: TreeMap[Address, bool]
-    proposals: TreeMap[int, Proposal]
-    proposal_ids: DynArray[int]
+class GovMind(gl.Contract):
+    owner: Address
+    dao_name: str
+    dao_description: str
 
-    def __init__(self, name: str) -> None:
-        self.name = name
-        self.admin = gl.message.sender_address
-        self.treasury = u256(0)
-        self.member_count = 0
-        self.proposal_count = 0
-        self.members = TreeMap[Address, bool]()
-        self.proposals = TreeMap[int, Proposal]()
-        self.proposal_ids = DynArray[int]()
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.dao_name = "GovMind"
+        self.dao_description = "An AI-governed decentralised autonomous organisation."
 
     @gl.public.view
-    def get_name(self) -> str:
-        return self.name
+    def get_dao_name(self) -> str:
+        return self.dao_name
+
+    @gl.public.view
+    def get_dao_description(self) -> str:
+        return self.dao_description
+
+    @gl.public.view
+    def get_owner(self) -> str:
+        return self.owner.as_hex
+
+    @gl.public.view
+    def get_contract_summary(self) -> str:
+        return self.dao_name + ": " + self.dao_description
 
     @gl.public.write
-    def get_proposal_screenshot(self, url: str) -> bytes:
-        # TODO: call gl.nondet.web.render(url) and return the bytes result
-        pass`,
-  task: "Implement `get_proposal_screenshot()` to render the given URL using `gl.nondet.web.render` and return the resulting screenshot bytes.",
+    def update_dao_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update"
+        assert len(new_description) > 0, "Description cannot be empty"
+        self.dao_description = new_description
+
+    proposal_count: u256
+    proposal_titles: TreeMap[str, str]
+    proposal_descriptions: TreeMap[str, str]
+    proposal_proposers: TreeMap[str, Address]
+    proposal_statuses: TreeMap[str, str]
+    members: TreeMap[str, bool]
+
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.dao_name = "GovMind"
+        self.dao_description = "An AI-governed decentralised autonomous organisation."
+        self.proposal_count = u256(0)
+        self.members[self.owner.as_hex] = True
+
+    @gl.public.write
+    def create_proposal(self, title: str, description: str) -> str:
+        assert self.members.get(gl.message.sender_address.as_hex, False), "Only members can propose"
+        assert len(title) > 0, "Title cannot be empty"
+        assert len(description) > 0, "Description cannot be empty"
+        proposal_id = str(self.proposal_count)
+        self.proposal_titles[proposal_id] = title
+        self.proposal_descriptions[proposal_id] = description
+        self.proposal_proposers[proposal_id] = gl.message.sender_address
+        self.proposal_statuses[proposal_id] = "open"
+        self.proposal_count = self.proposal_count + u256(1)
+        return proposal_id
+
+    proposal_ids: DynArray[str]
+
+    @gl.public.view
+    def get_proposal_json(self, proposal_id: str) -> str:
+        assert proposal_id in self.proposal_titles, "Proposal not found"
+        return json.dumps({
+            "id": proposal_id,
+            "title": self.proposal_titles[proposal_id],
+            "description": self.proposal_descriptions[proposal_id],
+            "proposer": self.proposal_proposers[proposal_id].as_hex,
+            "status": self.proposal_statuses[proposal_id],
+        }, sort_keys=True)
+
+    @gl.public.view
+    def get_open_proposals_json(self) -> str:
+        result = []
+        for pid in self.proposal_ids:
+            if self.proposal_statuses[pid] == "open":
+                result.append({"id": pid, "title": self.proposal_titles[pid]})
+        return json.dumps(result, sort_keys=True)
+
+    @gl.public.view
+    def get_all_proposals_json(self) -> str:
+        result = []
+        for pid in self.proposal_ids:
+            result.append({"id": pid, "title": self.proposal_titles[pid], "status": self.proposal_statuses[pid]})
+        return json.dumps(result, sort_keys=True)
+
+    @gl.public.write
+    def close_proposal(self, proposal_id: str) -> None:
+        assert proposal_id in self.proposal_titles, "Proposal not found"
+        assert gl.message.sender_address == self.owner, "Only owner can close"
+        assert self.proposal_statuses[proposal_id] == "open", "Only open proposals can be closed"
+        self.proposal_statuses[proposal_id] = "closed"
+
+    for_votes: TreeMap[str, u256]
+    against_votes: TreeMap[str, u256]
+    has_voted: TreeMap[str, bool]
+
+    @gl.public.write
+    def vote(self, proposal_id: str, support: bool) -> None:
+        assert proposal_id in self.proposal_titles, "Proposal not found"
+        voter_key = proposal_id + "_" + gl.message.sender_address.as_hex
+        assert not self.has_voted.get(voter_key, False), "Already voted"
+        assert self.members.get(gl.message.sender_address.as_hex, False), "Only members can vote"
+        assert self.proposal_statuses[proposal_id] == "open", "Proposal must be open"
+        self.has_voted[voter_key] = True
+        if support:
+            self.for_votes[proposal_id] = self.for_votes.get(proposal_id, u256(0)) + u256(1)
+        else:
+            self.against_votes[proposal_id] = self.against_votes.get(proposal_id, u256(0)) + u256(1)
+
+
+`,
+  task: `Add \`get_vote_tally(self, proposal_id: str) -> str\` as a \`@gl.public.view\` returning a JSON object with \`for_votes\` and \`against_votes\` as strings.`,
   hints: [
-    "`gl.nondet.web.render(url)` renders the page and returns bytes — this is the entire implementation.",
-    "The method must be `@gl.public.write` (not view) because non-deterministic calls require consensus.",
-    "Full implementation: `return gl.nondet.web.render(url)`.",
+    "Return json.dumps({'for_votes': str(fv), 'against_votes': str(av)}).",
+    "Use .get(proposal_id, u256(0)) to handle proposals with no votes yet.",
+    "Key line: `'for_votes': str(self.for_votes.get(proposal_id, u256(0)))`",
   ],
 };
 

@@ -3,135 +3,91 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 12,
   projectPath: "FREELANCE_ESCROW",
-  explanation: `## Lesson 12 — Dataclasses for Rich Application Records
+  explanation: `## Lesson 12 — Job JSON View
 
-Storing just a bio string is limiting. TrustLance needs to track a freelancer's portfolio URL and their AI evaluation score alongside the bio. Python's \`@dataclass\` decorator lets you bundle these fields into a single typed value.
-
-### Defining the Dataclass
-
-\`\`\`python
-from dataclasses import dataclass
-
-@dataclass
-class Application:
-    bio: str
-    portfolio_url: str
-    score: int = 0
-\`\`\`
-
-GenLayer can serialise dataclasses to persistent storage — treat them as plain structs.
-
-### TreeMap of Dataclasses
-
-\`\`\`python
-applications: TreeMap[Address, Application]
-
-# Store
-self.applications[sender] = Application(bio=bio, portfolio_url=url)
-
-# Read
-app = self.applications[addr]
-print(app.bio, app.score)
-\`\`\`
-
-### Updating a Field
-
-To update the score after evaluation, read the struct, mutate the field, and write it back:
-
-\`\`\`python
-app = self.applications[applicant]
-app.score = result["score"]
-self.applications[applicant] = app
-\`\`\`
-
-### Evolving \`apply\` and \`evaluate_applicant\`
-
-- \`apply(bio, portfolio_url)\` now accepts two parameters and creates an \`Application\` object.
-- \`evaluate_applicant\` writes the score back into the map after the LLM returns it.
-
-This richer data model prepares TrustLance for visual evaluation in Lesson 19.`,
+### What You'll Learn
+Build \`get_job_json(job_id)\` returning a JSON string — the standard way frontends read contract state.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address, u256, TreeMap
-from dataclasses import dataclass
+
+import json
+from genlayer import *
 
 
-@dataclass
-class Application:
-    bio: str
-    portfolio_url: str
-    score: int = 0  # populated after AI evaluation
+class TrustLance(gl.Contract):
+    owner: Address
+    platform_name: str
+    platform_description: str
 
-
-class FreelanceEscrow(gl.Contract):
-    title: str
-    client: Address
-    budget: u256
-    is_open: bool
-    status: str
-    applicant_count: int
-    applications: TreeMap[Address, Application]
-    awarded_to: Address
-
-    def __init__(self, title: str, budget: u256) -> None:
-        self.title = title
-        self.client = gl.message.sender_address
-        self.budget = budget
-        self.is_open = True
-        self.status = "OPEN"
-        self.applicant_count = 0
-        self.applications = TreeMap[Address, Application]()
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.platform_name = "TrustLance"
+        self.platform_description = "A GenLayer freelance escrow platform."
 
     @gl.public.view
-    def get_title(self) -> str:
-        return self.title
+    def get_platform_name(self) -> str:
+        return self.platform_name
+
+    @gl.public.view
+    def get_platform_description(self) -> str:
+        return self.platform_description
+
+    @gl.public.view
+    def get_owner(self) -> str:
+        return self.owner.as_hex
+
+    @gl.public.view
+    def get_contract_summary(self) -> str:
+        return self.platform_name + ": " + self.platform_description
 
     @gl.public.write
-    def apply(self, bio: str, portfolio_url: str) -> None:
-        if not bio:
-            raise gl.vm.UserError("bio required")
-        if self.applications.get(gl.message.sender_address, None) is not None:
-            raise gl.vm.UserError("already applied")
-        # TODO: create an Application dataclass instance and store it in self.applications
-        self.applicant_count += 1
+    def update_platform_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update"
+        assert len(new_description) > 0, "Description cannot be empty"
+        self.platform_description = new_description
 
-    @gl.public.view
-    def get_applicant_count(self) -> int:
-        return self.applicant_count
+    job_count: u256
+    job_titles: TreeMap[str, str]
+    job_descriptions: TreeMap[str, str]
+    job_clients: TreeMap[str, Address]
+    job_budgets: TreeMap[str, u256]
+    job_statuses: TreeMap[str, str]
+    job_freelancers: TreeMap[str, Address]
 
-    @gl.public.view
-    def get_application(self, applicant: Address) -> str:
-        app = self.applications.get(applicant, None)
-        return app.bio if app else ""
-
-    def _safe_text(self, text: str) -> str:
-        clean = text.replace("\\n", " ").replace("\\r", " ")
-        for ch in ["[", "]", "{", "}"]:
-            clean = clean.replace(ch, "")
-        return clean[:500]
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.platform_name = "TrustLance"
+        self.platform_description = "A GenLayer freelance escrow platform."
+        self.job_count = u256(0)
 
     @gl.public.write
-    def evaluate_applicant(self, applicant: Address) -> dict:
-        app = self.applications.get(applicant, None)
-        if app is None:
-            raise gl.vm.UserError("applicant not found")
-        safe_url = self._safe_text(app.portfolio_url)
-        content = gl.nondet.web.get(safe_url)[:2000]
-        prompt = (
-            f"Job: {self.title}\\n"
-            f"Bio: [USER INPUT: {self._safe_text(app.bio)}]\\n"
-            f"Portfolio content: {content}\\n"
-            'Respond JSON: {"hire": bool, "reason": str, "score": 0-100}'
-        )
-        result = gl.nondet.exec_prompt(prompt, response_format="json")
-        # TODO: update app.score from result["score"] and write back to self.applications
-        return result
+    def create_job(self, title: str, description: str, budget: u256) -> str:
+        assert len(title) > 0, "Title cannot be empty"
+        assert len(description) > 0, "Description cannot be empty"
+        assert budget > u256(0), "Budget must be greater than zero"
+
+        job_id = str(self.job_count)
+        self.job_titles[job_id] = title
+        self.job_descriptions[job_id] = description
+        self.job_clients[job_id] = gl.message.sender_address
+        self.job_budgets[job_id] = budget
+        self.job_statuses[job_id] = "open"
+        self.job_count = self.job_count + u256(1)
+        return job_id
+
+    job_ids: DynArray[str]
+
+    @gl.public.view
+    def get_job_json(self, job_id: str) -> str:
+        assert job_id in self.job_titles, "Job not found"
+        return json.dumps({
+            "id": job_id,
+            "title": self.job_titles[job_id],
 `,
-  task: "In `apply()`, create `Application(bio=bio, portfolio_url=portfolio_url)` and store it in `self.applications`. In `evaluate_applicant()`, read `result['score']`, set `app.score`, and write the updated struct back into the map.",
+  task: `Complete \`get_job_json\` to include all fields: id, title, description, client (as hex), budget (as str), status.`,
   hints: [
-    "Create the dataclass: `app = Application(bio=bio, portfolio_url=portfolio_url)` then `self.applications[gl.message.sender_address] = app`.",
-    "After getting the LLM result, read back the record: `app = self.applications[applicant]`, set `app.score = result['score']`.",
-    "Write the updated struct back: `self.applications[applicant] = app`.",
+    "Use json.dumps({...}) with sort_keys=True.",
+    "Convert budget to string: str(self.job_budgets[job_id]).",
+    "Key line: `'budget': str(self.job_budgets[job_id])`",
   ],
 };
 

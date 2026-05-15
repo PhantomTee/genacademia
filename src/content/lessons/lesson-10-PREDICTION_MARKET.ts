@@ -3,31 +3,29 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 10,
   projectPath: "PREDICTION_MARKET",
-  explanation: `## Lesson 10 — CAPSTONE: Persistent Counter for Unique Market IDs
+  explanation: `## Lesson 10 — Major Upgrade: Create a Prediction Market
 
-Hard-coding the market ID as \`"0"\` means every \`create_market\` call overwrites the same record. To support multiple independent markets, you need a persistent counter that increments each time a market is created.
+### What You'll Learn
 
-### The counter pattern
-
-\`market_count: u256\` starts at zero and is initialised in \`__init__\`. Every time a market is created, the current counter value becomes the market ID, data is stored, then the counter is incremented:
-
-\`\`\`python
-market_id = str(self.market_count)
-# ... store all market data using market_id ...
-self.market_count += u256(1)
-return market_id
-\`\`\`
-
-The increment happens **after** writing all market data. This ensures the ID embedded in the stored data matches what gets returned to the caller. The first market gets ID \`"0"\`, the second gets \`"1"\`, and so on.
-
-### Converting u256 to string
-
-\`str(self.market_count)\` converts the \`u256\` counter to a plain Python string so it can be used as a \`TreeMap\` key. This is the standard pattern for numeric IDs in GenLayer contracts.
-
-### What you have built
-
-After this capstone, PredictX can store an unlimited number of independent prediction markets — each with its own question, outcomes, creator, minimum stake, and status — all inside a single deployed contract. The identity layer (Lessons 1–5) and the market storage layer (Lessons 6–10) are now complete.`,
+Students build the first real market creation system using a persistent counter.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
+
+from genlayer import *
+
+# Continue building your contract — add the method described in the task
+`,
+  task: `Add:
+
+market_count: u256
+Initialize:
+
+self.market_count = u256(0)
+Use it to generate IDs:
+
+market_id = str(self.market_count)
+self.market_count += u256(1)
+Expected final code after Lesson 10
+# { "Depends": "py-genlayer:test" }
 
 from genlayer import *
 
@@ -36,17 +34,20 @@ class PredictX(gl.Contract):
     owner: Address
     platform_name: str
     platform_description: str
+
     market_questions: TreeMap[str, str]
     market_outcome_a: TreeMap[str, str]
     market_outcome_b: TreeMap[str, str]
     market_creators: TreeMap[str, Address]
-    market_statuses: TreeMap[str, str]
     market_min_stakes: TreeMap[str, u256]
+    market_statuses: TreeMap[str, str]
+    market_count: u256
 
     def __init__(self) -> None:
         self.owner = gl.message.sender_address
         self.platform_name = "PredictX"
         self.platform_description = "A GenLayer prediction market that uses AI-assisted resolution."
+        self.market_count = u256(0)
 
     @gl.public.view
     def get_platform_name(self) -> str:
@@ -77,20 +78,23 @@ class PredictX(gl.Contract):
         assert len(outcome_b) > 0, "Outcome B cannot be empty"
         assert outcome_a != outcome_b, "Outcomes must be different"
         assert min_stake > u256(0), "Minimum stake must be greater than zero"
-        market_id = "0"
+
+        market_id = str(self.market_count)
+
         self.market_creators[market_id] = gl.message.sender_address
         self.market_questions[market_id] = question
         self.market_outcome_a[market_id] = outcome_a
         self.market_outcome_b[market_id] = outcome_b
-        self.market_statuses[market_id] = "active"
         self.market_min_stakes[market_id] = min_stake
-        return market_id
-`,
-  task: "Add `market_count: u256` as a persistent field, initialize it to `u256(0)` in the constructor, replace the hardcoded `\"0\"` ID with `str(self.market_count)`, and increment the counter with `self.market_count += u256(1)` before returning.",
+        self.market_statuses[market_id] = "active"
+
+        self.market_count += u256(1)
+
+        return market_id`,
   hints: [
-    "Add `market_count: u256` in the class body and `self.market_count = u256(0)` in `__init__`.",
-    "Replace `market_id = \"0\"` with `market_id = str(self.market_count)`.",
-    "Add `self.market_count += u256(1)` AFTER storing all market data but BEFORE the `return market_id` line.",
+    "Add:.",
+    "market_count: u256",
+    "Key line: `First call returns:`",
   ],
 };
 

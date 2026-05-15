@@ -3,167 +3,178 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 23,
   projectPath: "FREELANCE_ESCROW",
-  explanation: `## Lesson 23 — VectorStorage: Semantic Search for Freelancers
+  explanation: `## Lesson 23 — Comparative AI Validation
 
-Finding the right freelancer by scanning every bio is expensive and imprecise. GenLayer's **VectorStorage** lets you index text and retrieve the most semantically similar entries — like a built-in embedding database inside your contract.
-
-### Declaring and Initialising VectorStorage
-
-\`\`\`python
-class FreelanceEscrow(gl.Contract):
-    profile_index: gl.VectorStorage
-    ...
-
-    def __init__(self, title: str, budget: u256) -> None:
-        ...
-        self.profile_index = gl.VectorStorage()
-\`\`\`
-
-### Indexing a Bio
-
-Call \`.add(text, metadata)\` when a freelancer applies. The metadata dict can store any JSON-serialisable data you want back at query time.
-
-\`\`\`python
-self.profile_index.add(bio, {"applicant": str(addr)})
-\`\`\`
-
-### Querying with Semantic Search
-
-\`\`\`python
-results = self.profile_index.search(query, top_k=5)
-# results: list of (score, metadata_dict)
-\`\`\`
-
-Each result is a \`(similarity_score, metadata)\` tuple. Higher score means more relevant. Return the metadata dicts for the top matches:
-
-\`\`\`python
-return [r[1] for r in results]
-\`\`\`
-
-### Why This Is Powerful
-
-Traditional smart contracts can only do exact key lookups. With VectorStorage, a client can search "experienced React developer with open-source contributions" and instantly surface the most relevant applicants — all on-chain, with AI-grade semantic matching.
-
-### Integration Point
-
-Add the \`.add()\` call inside \`apply()\` right after storing the Application so every new applicant is automatically indexed.`,
+### What You'll Learn
+Use a comparative validation pattern to ensure AI dispute output is consistent across all validators.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address, u256, TreeMap
-from dataclasses import dataclass
 
-OPEN = "OPEN"
-AWARDED = "AWARDED"
-WORK_SUBMITTED = "WORK_SUBMITTED"
-COMPLETE = "COMPLETE"
-DISPUTED = "DISPUTED"
+import json
+from genlayer import *
 
 
-@dataclass
-class Application:
-    bio: str
-    portfolio_url: str
-    score: int = 0
-    approved: bool = False
+class TrustLance(gl.Contract):
+    owner: Address
+    platform_name: str
+    platform_description: str
 
-
-class FreelanceEscrow(gl.Contract):
-    title: str
-    client: Address
-    budget: u256
-    escrow_amount: u256
-    is_open: bool
-    status: str
-    applicant_count: int
-    applications: TreeMap[Address, Application]
-    awarded_to: Address
-    deliverable_url: str
-    profile_index: gl.VectorStorage
-
-    def __init__(self, title: str, budget: u256) -> None:
-        self.title = title
-        self.client = gl.message.sender_address
-        self.budget = budget
-        self.escrow_amount = u256(0)
-        self.is_open = True
-        self.status = OPEN
-        self.applicant_count = 0
-        self.applications = TreeMap[Address, Application]()
-        self.awarded_to = Address("0x0000000000000000000000000000000000000000")
-        self.deliverable_url = ""
-        # TODO: initialise self.profile_index
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.platform_name = "TrustLance"
+        self.platform_description = "A GenLayer freelance escrow platform."
 
     @gl.public.view
-    def get_title(self) -> str:
-        return self.title
+    def get_platform_name(self) -> str:
+        return self.platform_name
 
     @gl.public.view
-    def get_escrow_amount(self) -> int:
-        return int(self.escrow_amount)
+    def get_platform_description(self) -> str:
+        return self.platform_description
+
+    @gl.public.view
+    def get_owner(self) -> str:
+        return self.owner.as_hex
+
+    @gl.public.view
+    def get_contract_summary(self) -> str:
+        return self.platform_name + ": " + self.platform_description
+
+    @gl.public.write
+    def update_platform_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update"
+        assert len(new_description) > 0, "Description cannot be empty"
+        self.platform_description = new_description
+
+    job_count: u256
+    job_titles: TreeMap[str, str]
+    job_descriptions: TreeMap[str, str]
+    job_clients: TreeMap[str, Address]
+    job_budgets: TreeMap[str, u256]
+    job_statuses: TreeMap[str, str]
+    job_freelancers: TreeMap[str, Address]
+
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.platform_name = "TrustLance"
+        self.platform_description = "A GenLayer freelance escrow platform."
+        self.job_count = u256(0)
+
+    @gl.public.write
+    def create_job(self, title: str, description: str, budget: u256) -> str:
+        assert len(title) > 0, "Title cannot be empty"
+        assert len(description) > 0, "Description cannot be empty"
+        assert budget > u256(0), "Budget must be greater than zero"
+
+        job_id = str(self.job_count)
+        self.job_titles[job_id] = title
+        self.job_descriptions[job_id] = description
+        self.job_clients[job_id] = gl.message.sender_address
+        self.job_budgets[job_id] = budget
+        self.job_statuses[job_id] = "open"
+        self.job_count = self.job_count + u256(1)
+        return job_id
+
+    job_ids: DynArray[str]
+
+    @gl.public.view
+    def get_job_json(self, job_id: str) -> str:
+        assert job_id in self.job_titles, "Job not found"
+        return json.dumps({
+            "id": job_id,
+            "title": self.job_titles[job_id],
+            "description": self.job_descriptions[job_id],
+            "client": self.job_clients[job_id].as_hex,
+            "budget": str(self.job_budgets[job_id]),
+            "status": self.job_statuses[job_id],
+        }, sort_keys=True)
+
+    @gl.public.view
+    def get_open_jobs_json(self) -> str:
+        result = []
+        for job_id in self.job_ids:
+            if self.job_statuses[job_id] == "open":
+                result.append({"id": job_id, "title": self.job_titles[job_id], "budget": str(self.job_budgets[job_id])})
+        return json.dumps(result, sort_keys=True)
+
+    @gl.public.view
+    def get_all_jobs_json(self) -> str:
+        result = []
+        for job_id in self.job_ids:
+            result.append({"id": job_id, "title": self.job_titles[job_id], "status": self.job_statuses[job_id]})
+        return json.dumps(result, sort_keys=True)
+
+    @gl.public.write
+    def close_job(self, job_id: str) -> None:
+        assert job_id in self.job_titles, "Job not found"
+        assert gl.message.sender_address == self.job_clients[job_id], "Only client can close"
+        assert self.job_statuses[job_id] == "open", "Only open jobs can be closed"
+        self.job_statuses[job_id] = "closed"
+
+    job_escrow: TreeMap[str, u256]
+    job_deliveries: TreeMap[str, str]
+    freelancer_claimed: TreeMap[str, bool]
 
     @gl.public.write.payable
-    def fund_escrow(self) -> None:
-        if gl.message.sender_address != self.client:
-            raise gl.vm.UserError("only client can fund")
-        self.escrow_amount += gl.message.value
+    def fund_job(self, job_id: str) -> None:
+        assert job_id in self.job_titles, "Job not found"
+        assert gl.message.sender_address == self.job_clients[job_id], "Only client can fund"
+        assert self.job_statuses[job_id] == "open", "Job must be open"
+        assert gl.message.value >= self.job_budgets[job_id], "Insufficient funds"
+        self.job_escrow[job_id] = gl.message.value
+        self.job_statuses[job_id] = "funded"
 
     @gl.public.write
-    def apply(self, bio: str, portfolio_url: str) -> None:
-        if self.status != OPEN:
-            raise gl.vm.UserError("job is not open")
-        addr = gl.message.sender_address
-        if self.applications.get(addr, None) is not None:
-            raise gl.vm.UserError("already applied")
-        self.applications[addr] = Application(bio=bio, portfolio_url=portfolio_url)
-        self.applicant_count += 1
-        # TODO: index the bio in profile_index with metadata {"applicant": str(addr)}
+    def accept_job(self, job_id: str) -> None:
+        assert job_id in self.job_titles, "Job not found"
+        assert self.job_statuses[job_id] == "funded", "Job must be funded"
+        self.job_freelancers[job_id] = gl.message.sender_address
+        self.job_statuses[job_id] = "accepted"
 
     @gl.public.write
-    def award_job(self, freelancer: Address) -> None:
-        if gl.message.sender_address != self.client:
-            raise gl.vm.UserError("only client can award")
-        if self.status != OPEN:
-            raise gl.vm.UserError("job is not open")
-        if self.applications.get(freelancer, None) is None:
-            raise gl.vm.UserError("applicant not found")
-        self.awarded_to = freelancer
-        self.status = AWARDED
+    def submit_delivery(self, job_id: str, delivery_ref: str) -> None:
+        assert job_id in self.job_titles, "Job not found"
+        assert gl.message.sender_address == self.job_freelancers[job_id], "Only freelancer can submit"
+        assert self.job_statuses[job_id] == "accepted", "Job must be accepted"
+        self.job_deliveries[job_id] = delivery_ref
+        self.job_statuses[job_id] = "delivered"
 
     @gl.public.write
-    def submit_work(self, deliverable_url: str) -> None:
-        if gl.message.sender_address != self.awarded_to:
-            raise gl.vm.UserError("only awarded freelancer can submit")
-        if self.status != AWARDED:
-            raise gl.vm.UserError("job is not awarded")
-        self.deliverable_url = deliverable_url
-        self.status = WORK_SUBMITTED
+    def confirm_delivery(self, job_id: str) -> None:
+        assert job_id in self.job_titles, "Job not found"
+        assert gl.message.sender_address == self.job_clients[job_id], "Only client can confirm"
+        assert self.job_statuses[job_id] == "delivered", "Delivery must be submitted first"
+        assert not self.freelancer_claimed.get(job_id, False), "Already paid"
+        self.freelancer_claimed[job_id] = True
+        self.job_statuses[job_id] = "completed"
+        gl.message.recipient_address.transfer(self.job_escrow[job_id])
 
     @gl.public.write
-    def approve_work(self) -> None:
-        if gl.message.sender_address != self.client:
-            raise gl.vm.UserError("only client can approve")
-        if self.status != WORK_SUBMITTED:
-            raise gl.vm.UserError("work has not been submitted")
-        self.status = COMPLETE
-
-    @gl.public.write
-    def release_payment(self) -> None:
-        if gl.message.sender_address != self.client:
-            raise gl.vm.UserError("only client can release payment")
-        if self.status != COMPLETE:
-            raise gl.vm.UserError("job is not complete")
-        gl.send(self.awarded_to, self.escrow_amount)
-        self.escrow_amount = u256(0)
-
-    @gl.public.view
-    def find_freelancers(self, query: str) -> list:
-        pass  # TODO: search profile_index for top-5 matches and return metadata list
+    def review_dispute_with_ai(self, job_id: str, reason: str) -> str:
+        assert job_id in self.job_titles, "Job not found"
+        assert self.job_statuses[job_id] == "delivered", "Job must be in delivered state"
+        delivery = self.job_deliveries.get(job_id, "no delivery ref")
+        description = self.job_descriptions[job_id]
+        prompt = (
+            f"A freelance job dispute:\\n"
+            f"Job Description: {description}\\n"
+            f"Delivery Reference: {delivery}\\n"
+            f"Dispute Reason: {reason}\\n\\n"
+            f"Respond with JSON: {{\\"verdict\\": \\"release\\" or \\"refund\\", "
+            f"\\"confidence\\": 0-100, \\"reason\\": \\"explanation\\"}}"
+        )
+        def run(prompt):
+            result = gl.nondet.exec_prompt(prompt)
+            import re
+            m = re.search(r'\\{.*\\}', result, re.DOTALL)
+            return m.group(0) if m else result
+        result = gl.eq_principle_strict_eq(run, prompt)
+        return result
 `,
-  task: "Initialise `self.profile_index = gl.VectorStorage()` in `__init__`. In `apply()`, call `self.profile_index.add(bio, {\"applicant\": str(addr)})` after storing the application. Implement `find_freelancers()` to search the index with `top_k=5` and return the metadata dicts.",
+  task: `Refine \`review_dispute_with_ai\` to extract JSON from the AI response using a regex. If extraction fails, return the raw text. The result must be identical across validators.`,
   hints: [
-    "Declare the field as `profile_index: gl.VectorStorage` at class level, then set `self.profile_index = gl.VectorStorage()` inside `__init__`.",
-    "In `apply()`, after `self.applicant_count += 1`, add: `self.profile_index.add(bio, {\"applicant\": str(addr)})`.",
-    "Full `find_freelancers`: `results = self.profile_index.search(query, top_k=5)` then `return [r[1] for r in results]`.",
+    "Use import re and re.search(r'{.*}', result, re.DOTALL).",
+    "Return m.group(0) if match found, else return result.",
+    "Key line: `m = re.search(r'{.*}', result, re.DOTALL)`",
   ],
 };
 

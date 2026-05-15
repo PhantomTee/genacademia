@@ -3,111 +3,120 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 16,
   projectPath: "FREELANCE_ESCROW",
-  explanation: `## Lesson 16 — run_nondet_unsafe: Leader/Validator Pattern
+  explanation: `## Lesson 16 — Funding a Job
 
-\`exec_prompt\` handles consensus automatically, but sometimes you need fine-grained control — for example when the leader does expensive work (fetching a URL + calling the LLM) and validators should do something lighter. GenLayer provides \`gl.vm.run_nondet_unsafe\` for this.
-
-### The Pattern
-
-\`\`\`python
-result = gl.vm.run_nondet_unsafe(
-    leader_fn,    # Callable[[], T] — runs on the leader node
-    validator_fn  # Callable[[T], bool] — runs on every validator
-)
-\`\`\`
-
-- **Leader** does the heavy lifting: fetches data, calls LLM, builds the result.
-- **Validator** receives the leader's result and returns \`True\` if it looks legitimate, \`False\` to reject.
-
-### Why Separate?
-
-Validators don't need to re-run expensive LLM calls. They only need to check that the result *could plausibly be correct* — structure checks, range checks, sanity checks. This makes validation cheap while keeping the leader honest.
-
-### Example Split
-
-\`\`\`python
-def _leader_eval(self, url: str) -> dict:
-    content = gl.nondet.web.get(url)[:2000]
-    return gl.nondet.exec_prompt(
-        f"Job: {self.title}\\nContent: {content}\\nReturn JSON...",
-        response_format="json"
-    )
-
-def _validate_eval(self, r) -> bool:
-    return isinstance(r, dict) and "score" in r
-\`\`\`
-
-The unsafe suffix is a reminder that you are responsible for writing a correct validator.`,
+### What You'll Learn
+Add \`fund_job()\` with \`@gl.public.write.payable\` so clients can lock GEN into escrow.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address, u256, TreeMap
-from dataclasses import dataclass
 
-OPEN = "OPEN"
-AWARDED = "AWARDED"
-WORK_SUBMITTED = "WORK_SUBMITTED"
-COMPLETE = "COMPLETE"
-DISPUTED = "DISPUTED"
+import json
+from genlayer import *
 
 
-@dataclass
-class Application:
-    bio: str
-    portfolio_url: str
-    score: int = 0
+class TrustLance(gl.Contract):
+    owner: Address
+    platform_name: str
+    platform_description: str
 
-
-class FreelanceEscrow(gl.Contract):
-    title: str
-    client: Address
-    budget: u256
-    is_open: bool
-    status: str
-    applicant_count: int
-    applications: TreeMap[Address, Application]
-    awarded_to: Address
-    deliverable_url: str
-
-    def __init__(self, title: str, budget: u256) -> None:
-        self.title = title
-        self.client = gl.message.sender_address
-        self.budget = budget
-        self.is_open = True
-        self.status = OPEN
-        self.applicant_count = 0
-        self.applications = TreeMap[Address, Application]()
-        self.deliverable_url = ""
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.platform_name = "TrustLance"
+        self.platform_description = "A GenLayer freelance escrow platform."
 
     @gl.public.view
-    def get_title(self) -> str:
-        return self.title
+    def get_platform_name(self) -> str:
+        return self.platform_name
 
-    def _leader_eval(self, url: str) -> dict:
-        pass  # TODO: fetch url, call exec_prompt with response_format="json", return result
+    @gl.public.view
+    def get_platform_description(self) -> str:
+        return self.platform_description
 
-    def _validate_eval(self, r) -> bool:
-        pass  # TODO: return True if r is a dict with "score" key
+    @gl.public.view
+    def get_owner(self) -> str:
+        return self.owner.as_hex
+
+    @gl.public.view
+    def get_contract_summary(self) -> str:
+        return self.platform_name + ": " + self.platform_description
 
     @gl.public.write
-    def evaluate_applicant(self, applicant: Address) -> dict:
-        app = self.applications.get(applicant, None)
-        if app is None:
-            raise gl.vm.UserError("applicant not found")
-        url = app.portfolio_url
-        # TODO: replace direct exec_prompt with gl.vm.run_nondet_unsafe(leader, validator)
-        result = gl.nondet.exec_prompt(
-            f"Job: {self.title}\\nURL: {url}\\nReturn JSON: hire bool, reason str, score int",
-            response_format="json"
-        )
-        app.score = result.get("score", 0)
-        self.applications[applicant] = app
-        return result
+    def update_platform_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update"
+        assert len(new_description) > 0, "Description cannot be empty"
+        self.platform_description = new_description
+
+    job_count: u256
+    job_titles: TreeMap[str, str]
+    job_descriptions: TreeMap[str, str]
+    job_clients: TreeMap[str, Address]
+    job_budgets: TreeMap[str, u256]
+    job_statuses: TreeMap[str, str]
+    job_freelancers: TreeMap[str, Address]
+
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.platform_name = "TrustLance"
+        self.platform_description = "A GenLayer freelance escrow platform."
+        self.job_count = u256(0)
+
+    @gl.public.write
+    def create_job(self, title: str, description: str, budget: u256) -> str:
+        assert len(title) > 0, "Title cannot be empty"
+        assert len(description) > 0, "Description cannot be empty"
+        assert budget > u256(0), "Budget must be greater than zero"
+
+        job_id = str(self.job_count)
+        self.job_titles[job_id] = title
+        self.job_descriptions[job_id] = description
+        self.job_clients[job_id] = gl.message.sender_address
+        self.job_budgets[job_id] = budget
+        self.job_statuses[job_id] = "open"
+        self.job_count = self.job_count + u256(1)
+        return job_id
+
+    job_ids: DynArray[str]
+
+    @gl.public.view
+    def get_job_json(self, job_id: str) -> str:
+        assert job_id in self.job_titles, "Job not found"
+        return json.dumps({
+            "id": job_id,
+            "title": self.job_titles[job_id],
+            "description": self.job_descriptions[job_id],
+            "client": self.job_clients[job_id].as_hex,
+            "budget": str(self.job_budgets[job_id]),
+            "status": self.job_statuses[job_id],
+        }, sort_keys=True)
+
+    @gl.public.view
+    def get_open_jobs_json(self) -> str:
+        result = []
+        for job_id in self.job_ids:
+            if self.job_statuses[job_id] == "open":
+                result.append({"id": job_id, "title": self.job_titles[job_id], "budget": str(self.job_budgets[job_id])})
+        return json.dumps(result, sort_keys=True)
+
+    @gl.public.view
+    def get_all_jobs_json(self) -> str:
+        result = []
+        for job_id in self.job_ids:
+            result.append({"id": job_id, "title": self.job_titles[job_id], "status": self.job_statuses[job_id]})
+        return json.dumps(result, sort_keys=True)
+
+    @gl.public.write
+    def close_job(self, job_id: str) -> None:
+        assert job_id in self.job_titles, "Job not found"
+        assert gl.message.sender_address == self.job_clients[job_id], "Only client can close"
+        assert self.job_statuses[job_id] == "open", "Only open jobs can be closed"
+        self.job_statuses[job_id] = "closed"
+
+    job_escrow: TreeMap[str, u256]
 `,
-  task: "Implement `_leader_eval(self, url)` to fetch the URL and call `exec_prompt` for JSON, and `_validate_eval(self, r)` to check the result is a dict with a `score` key. Update `evaluate_applicant()` to use `gl.vm.run_nondet_unsafe`.",
+  task: `Add \`fund_job(self, job_id: str)\` with \`@gl.public.write.payable\`. Verify: job exists, caller is client, status is "open", value >= budget. Store \`gl.message.value\` in \`job_escrow[job_id]\` and set status to "funded".`,
   hints: [
-    "`_leader_eval` should do: `content = gl.nondet.web.get(url)[:2000]` then `return gl.nondet.exec_prompt(prompt, response_format='json')`.",
-    "`_validate_eval` returns `isinstance(r, dict) and 'score' in r`.",
-    "In `evaluate_applicant`, replace the direct call with: `result = gl.vm.run_nondet_unsafe(lambda: self._leader_eval(url), lambda r: self._validate_eval(r))`.",
+    "Use @gl.public.write.payable — the caller sends GEN with the transaction.",
+    "Check: gl.message.value >= self.job_budgets[job_id].",
+    "Key line: `self.job_escrow[job_id] = gl.message.value`",
   ],
 };
 

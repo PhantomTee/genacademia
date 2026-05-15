@@ -3,126 +3,87 @@ import type { LessonContent } from "@/types/content";
 const content: LessonContent = {
   lessonId: 11,
   projectPath: "DEVELOPER_REPUTATION",
-  explanation: `## Lesson 11 — TreeMap: Efficient On-Chain Mappings
+  explanation: `## Lesson 11 — Listing Indexing with DynArray
 
-As CodeVault grows, you need to store structured data per developer — their handle, score, and more. \`TreeMap\` is GenLayer's ordered key-value store, designed for efficient on-chain persistence.
-
-### TreeMap Basics
-
-\`\`\`python
-from genlayer.types import TreeMap, Address
-
-developers: TreeMap[Address, str]    # address → handle
-scores: TreeMap[Address, int]        # address → score
-
-def __init__(self, ...) -> None:
-    self.developers = TreeMap[Address, str]()
-    self.scores = TreeMap[Address, int]()
-\`\`\`
-
-### Reading and Writing
-
-\`\`\`python
-# Write
-self.developers[gl.message.sender_address] = handle
-
-# Read with default (safe for missing keys)
-score = self.scores.get(dev, 0)
-
-# Read (raises KeyError if missing)
-handle = self.developers[dev]
-\`\`\`
-
-Always use \`.get(key, default)\` when the key might not exist to avoid runtime errors.
-
-### Upgrading register()
-
-Now that you have a \`developers\` map, \`register()\` should store the handle alongside the boolean registration flag:
-
-\`\`\`python
-self.developers[gl.message.sender_address] = handle
-\`\`\`
-
-### get_score View
-
-Expose a view that returns a developer's score, defaulting to 0 if they haven't been scored yet — this is the safe pattern for optional state.
-
-**Key concepts this lesson:** \`TreeMap\`, key-value state, safe reads with \`.get()\`.`,
+### What You'll Learn
+Add \`listing_ids: DynArray[str]\` for ordered enumeration of all listings.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-from genlayer import gl
-from genlayer.types import Address, u256, TreeMap
+
+import json
+from genlayer import *
 
 
-class DeveloperReputation(gl.Contract):
-    registry_name: str
-    developer_count: int
-    curator: Address
-    registry_id: u256
-    active: bool
-    developers: TreeMap[Address, str]
-    scores: TreeMap[Address, int]
+class CodeVault(gl.Contract):
+    owner: Address
+    platform_name: str
+    platform_description: str
 
-    def __init__(self, name: str, registry_id: u256) -> None:
-        self.registry_name = name
-        self.developer_count = 0
-        self.curator = gl.message.sender_address
-        self.registry_id = registry_id
-        self.active = True
-        self.developers = TreeMap[Address, str]()
-        self.scores = TreeMap[Address, int]()
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.platform_name = "CodeVault"
+        self.platform_description = "A GenLayer private code marketplace."
 
     @gl.public.view
-    def get_registry_name(self) -> str:
-        return self.registry_name
+    def get_platform_name(self) -> str:
+        return self.platform_name
 
     @gl.public.view
-    def get_curator(self) -> str:
-        return str(self.curator)
+    def get_platform_description(self) -> str:
+        return self.platform_description
 
     @gl.public.view
-    def is_active(self) -> bool:
-        return self.active
+    def get_owner(self) -> str:
+        return self.owner.as_hex
+
+    @gl.public.view
+    def get_contract_summary(self) -> str:
+        return self.platform_name + ": " + self.platform_description
 
     @gl.public.write
-    def register(self, handle: str) -> None:
-        if not handle:
-            raise gl.vm.UserError("handle cannot be empty")
-        if self.developers.get(gl.message.sender_address, ""):
-            raise gl.vm.UserError("already registered")
-        self.developers[gl.message.sender_address] = handle
-        self.developer_count += 1
+    def update_platform_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update"
+        assert len(new_description) > 0, "Description cannot be empty"
+        self.platform_description = new_description
 
-    def _safe_url(self, url: str) -> str:
-        if not url.startswith("https://github.com/"):
-            raise gl.vm.UserError("invalid GitHub URL")
-        url = url.split()[0].split('"')[0].split("'")[0]
-        return url
+    listing_count: u256
+    listing_titles: TreeMap[str, str]
+    listing_descriptions: TreeMap[str, str]
+    listing_sellers: TreeMap[str, Address]
+    listing_prices: TreeMap[str, u256]
+    listing_statuses: TreeMap[str, str]
+    listing_source_hashes: TreeMap[str, str]
+    listing_previews: TreeMap[str, str]
+
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.platform_name = "CodeVault"
+        self.platform_description = "A GenLayer private code marketplace."
+        self.listing_count = u256(0)
 
     @gl.public.write
-    def score_github(self, dev: Address, github_url: str) -> dict:
-        safe_url = self._safe_url(github_url)
-        page = gl.nondet.web.get(safe_url)
-        prompt = (
-            f"Analyse this GitHub profile. Content: {page[:2000]}\\n"
-            f"Return JSON: score (0-100), strengths (str), areas_to_improve (str)."
-        )
-        result = gl.nondet.exec_prompt(prompt, response_format="json")
-        self.scores[dev] = result["score"]
-        return result
+    def create_listing(self, title: str, description: str, price: u256, source_hash: str, preview: str) -> str:
+        assert len(title) > 0, "Title cannot be empty"
+        assert len(description) > 0, "Description cannot be empty"
+        assert price > u256(0), "Price must be greater than zero"
+        assert len(source_hash) > 0, "Source hash cannot be empty"
+        listing_id = str(self.listing_count)
+        self.listing_titles[listing_id] = title
+        self.listing_descriptions[listing_id] = description
+        self.listing_sellers[listing_id] = gl.message.sender_address
+        self.listing_prices[listing_id] = price
+        self.listing_statuses[listing_id] = "active"
+        self.listing_source_hashes[listing_id] = source_hash
+        self.listing_previews[listing_id] = preview
+        self.listing_count = self.listing_count + u256(1)
+        return listing_id
 
-    @gl.public.view
-    def get_score(self, dev: Address) -> int:
-        pass
-
-    @gl.public.view
-    def get_developer_count(self) -> int:
-        return self.developer_count
+    listing_ids: DynArray[str]
 `,
-  task: "Implement `get_score(dev)` to return the developer's score from `self.scores`, defaulting to `0` if they have not been scored yet.",
+  task: `Add \`listing_ids: DynArray[str]\` and in \`create_listing\` call \`self.listing_ids.append(listing_id)\` after all field assignments.`,
   hints: [
-    "Use `self.scores.get(dev, 0)` to safely retrieve the score with a default of 0.",
-    "The method is a `@gl.public.view` — it should only read, never write.",
-    "The complete body is `return self.scores.get(dev, 0)`.",
+    "Declare listing_ids: DynArray[str] at class level.",
+    "Append after all TreeMap writes.",
+    "Key line: `self.listing_ids.append(listing_id)`",
   ],
 };
 
