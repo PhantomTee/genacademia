@@ -7,14 +7,8 @@ const content: LessonContent = {
 
 ### What You'll Learn
 
-Students combine everything from lessons 1–4 into the first complete PredictX identity contract.`,
+You'll combine everything from lessons 1–4 into the first complete PredictX identity contract.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-
-from genlayer import *
-
-# Continue building your contract — add the method described in the task
-`,
-  expectedCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 from genlayer import *
 
@@ -51,9 +45,6 @@ class PredictX(gl.Contract):
         assert len(new_description) > 0, "Description cannot be empty"
 
         self.platform_description = new_description
-get_contract_summary() returns:
-
-PredictX: A GenLayer prediction market that uses AI-assisted resolution.
 `,
   task: `Add one more view method:
 

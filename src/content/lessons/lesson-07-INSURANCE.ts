@@ -7,7 +7,7 @@ const content: LessonContent = {
 
 ### What You'll Learn
 
-Students learn how to track the parties in a dispute.
+You'll learn how to track the parties in a dispute.
 
 The claimant is the caller who submits the case:
 
@@ -17,7 +17,39 @@ The respondent is passed as an Address.`,
 
 from genlayer import *
 
-# Continue building your contract — add the method described in the task
+
+class CaseWise(gl.Contract):
+    owner: Address
+    court_name: str
+    court_rules: str
+
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.court_name = "CaseWise"
+        self.court_rules = "Parties submit cases and evidence for AI-assisted review."
+
+    @gl.public.view
+    def get_court_name(self) -> str:
+        return self.court_name
+
+    @gl.public.view
+    def get_court_rules(self) -> str:
+        return self.court_rules
+
+    @gl.public.view
+    def get_owner(self) -> str:
+        return self.owner.as_hex
+
+    @gl.public.view
+    def get_contract_summary(self) -> str:
+        return self.court_name + ": " + self.court_rules
+
+    @gl.public.write
+    def update_court_rules(self, new_rules: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update rules"
+        assert len(new_rules) > 0, "Rules cannot be empty"
+
+        self.court_rules = new_rules
 `,
   expectedCode: `@gl.public.write
 def submit_case(self, title: str, claim: str, respondent: Address) -> str:
@@ -30,15 +62,6 @@ def submit_case(self, title: str, claim: str, respondent: Address) -> str:
     self.case_statuses[case_id] = "submitted"
 
     return case_id
-Calling:
-
-submit_case("Payment dispute", "The freelancer did not deliver the agreed work.", respondent)
-returns:
-
-0
-Case status becomes:
-
-submitted
 `,
   task: `Add a first version of:
 

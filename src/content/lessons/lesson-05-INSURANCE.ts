@@ -7,7 +7,7 @@ const content: LessonContent = {
 
 ### What You'll Learn
 
-Students combine the first four lessons into a complete CaseWise identity contract.
+You'll combine the first four lessons into a complete CaseWise identity contract.
 
 They now know:
 
@@ -19,12 +19,6 @@ write methods
 owner-only permissions
 basic validation`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-
-from genlayer import *
-
-# Continue building your contract — add the method described in the task
-`,
-  expectedCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 from genlayer import *
 
@@ -61,7 +55,6 @@ class CaseWise(gl.Contract):
         assert len(new_rules) > 0, "Rules cannot be empty"
 
         self.court_rules = new_rules
-get_contract_summary() → CaseWise: Parties submit cases and evidence for AI-assisted review.
 `,
   task: `Add:
 

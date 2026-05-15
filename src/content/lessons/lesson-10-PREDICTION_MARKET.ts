@@ -7,32 +7,8 @@ const content: LessonContent = {
 
 ### What You'll Learn
 
-Students build the first real market creation system using a persistent counter.`,
+You'll build the first real market creation system using a persistent counter.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-
-from genlayer import *
-
-# Continue building your contract — add the method described in the task
-`,
-  expectedCode: `First call returns:
-
-0
-Second call returns:
-
-1
-`,
-  task: `Add:
-
-market_count: u256
-Initialize:
-
-self.market_count = u256(0)
-Use it to generate IDs:
-
-market_id = str(self.market_count)
-self.market_count += u256(1)
-Expected final code after Lesson 10
-# { "Depends": "py-genlayer:test" }
 
 from genlayer import *
 
@@ -97,11 +73,22 @@ class PredictX(gl.Contract):
 
         self.market_count += u256(1)
 
-        return market_id`,
+        return market_id
+`,
+  task: `Add:
+
+market_count: u256
+Initialize:
+
+self.market_count = u256(0)
+Use it to generate IDs:
+
+market_id = str(self.market_count)
+self.market_count += u256(1)`,
   hints: [
     "Add:.",
     "market_count: u256",
-    "Key line: `First call returns:`",
+    "Key line: `def __init__(self) -> None:`",
   ],
 };
 

@@ -7,7 +7,7 @@ const content: LessonContent = {
 
 ### What You'll Learn
 
-Students learn what an AI-assisted dispute-resolution system is.
+You'll learn what an AI-assisted dispute-resolution system is.
 
 A dispute system needs:
 
@@ -50,12 +50,6 @@ class CaseWise(gl.Contract):
     @gl.public.view
     def get_project_name(self) -> str:
         return self.project_name
-Calling:
-
-get_project_name()
-returns:
-
-CaseWise: AI-Assisted Dispute Resolution
 `,
   task: `Change the project name to:
 

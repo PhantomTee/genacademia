@@ -7,7 +7,7 @@ const content: LessonContent = {
 
 ### What You'll Learn
 
-Students learn how to update contract state using @gl.public.write.
+You'll learn how to update contract state using @gl.public.write.
 
 They also learn that only the owner should be able to update the dispute court rules.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
@@ -70,21 +70,6 @@ class CaseWise(gl.Contract):
         assert len(new_rules) > 0, "Rules cannot be empty"
 
         self.court_rules = new_rules
-After calling:
-
-update_court_rules("Cases must include clear claims and evidence references.")
-then:
-
-get_court_rules()
-returns:
-
-Cases must include clear claims and evidence references.
-Non-owner call fails with:
-
-Only owner can update rules
-Empty rules fail with:
-
-Rules cannot be empty
 `,
   task: `Add:
 

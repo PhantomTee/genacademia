@@ -12,30 +12,6 @@ Students replace temporary case ID "0" with a real counter.`,
 
 from genlayer import *
 
-# Continue building your contract — add the method described in the task
-`,
-  expectedCode: `First case returns:
-
-0
-Second case returns:
-
-1
-`,
-  task: `Add:
-
-case_count: u256
-Initialize:
-
-self.case_count = u256(0)
-Use:
-
-case_id = str(self.case_count)
-self.case_count += u256(1)
-Expected final code after Lesson 10
-# { "Depends": "py-genlayer:test" }
-
-from genlayer import *
-
 
 class CaseWise(gl.Contract):
     owner: Address
@@ -99,11 +75,22 @@ class CaseWise(gl.Contract):
 
         self.case_count += u256(1)
 
-        return case_id`,
+        return case_id
+`,
+  task: `Add:
+
+case_count: u256
+Initialize:
+
+self.case_count = u256(0)
+Use:
+
+case_id = str(self.case_count)
+self.case_count += u256(1)`,
   hints: [
     "Add:.",
     "case_count: u256",
-    "Key line: `First case returns:`",
+    "Key line: `def __init__(self) -> None:`",
   ],
 };
 

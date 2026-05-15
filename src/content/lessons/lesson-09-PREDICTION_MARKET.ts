@@ -7,34 +7,46 @@ const content: LessonContent = {
 
 ### What You'll Learn
 
-Students learn how one logical record can be split across multiple TreeMap fields.`,
+You'll learn how one logical record can be split across multiple TreeMap fields.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 from genlayer import *
 
-# Continue building your contract — add the method described in the task
+
+class PredictX(gl.Contract):
+    owner: Address
+    platform_name: str
+    platform_description: str
+
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.platform_name = "PredictX"
+        self.platform_description = "A GenLayer prediction market that uses AI-assisted resolution."
+
+    @gl.public.view
+    def get_platform_name(self) -> str:
+        return self.platform_name
+
+    @gl.public.view
+    def get_platform_description(self) -> str:
+        return self.platform_description
+
+    @gl.public.view
+    def get_owner(self) -> str:
+        return self.owner.as_hex
+
+    @gl.public.view
+    def get_contract_summary(self) -> str:
+        return self.platform_name + ": " + self.platform_description
+
+    @gl.public.write
+    def update_platform_description(self, new_description: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update description"
+        assert len(new_description) > 0, "Description cannot be empty"
+
+        self.platform_description = new_description
 `,
-  expectedCode: `Invalid call:
-
-create_market("", "Yes", "No", u256(100))
-fails with:
-
-Question cannot be empty
-Invalid call:
-
-create_market("Will it rain?", "Yes", "Yes", u256(100))
-fails with:
-
-Outcomes must be different
-`,
-  task: `Add validation for market creation:
-
-Question cannot be empty.
-Outcome A cannot be empty.
-Outcome B cannot be empty.
-Outcome A and B cannot be the same.
-Expected code for create_market
-@gl.public.write
+  expectedCode: `@gl.public.write
 def create_market(self, question: str, outcome_a: str, outcome_b: str, min_stake: u256) -> str:
     assert len(question) > 0, "Question cannot be empty"
     assert len(outcome_a) > 0, "Outcome A cannot be empty"
@@ -50,11 +62,18 @@ def create_market(self, question: str, outcome_a: str, outcome_b: str, min_stake
     self.market_min_stakes[market_id] = min_stake
     self.market_statuses[market_id] = "active"
 
-    return market_id`,
+    return market_id
+`,
+  task: `Add validation for market creation:
+
+Question cannot be empty.
+Outcome A cannot be empty.
+Outcome B cannot be empty.
+Outcome A and B cannot be the same.`,
   hints: [
     "Add validation for market creation:.",
     "Question cannot be empty.",
-    "Key line: `Invalid call:`",
+    "Key line: `def create_market(self, question: str, outcome_a: str, outcome_b: str, min_stake: u256) -> str:`",
   ],
 };
 

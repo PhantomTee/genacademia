@@ -11,6 +11,7 @@ export function useGenLayerClient() {
 
   return createClient({
     chain: studionet,
+    account: connectorClient.account,
     provider: connectorClient,
   });
 }

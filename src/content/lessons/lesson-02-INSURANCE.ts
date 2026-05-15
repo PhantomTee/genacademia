@@ -7,7 +7,7 @@ const content: LessonContent = {
 
 ### What You'll Learn
 
-Students learn the basic contract skeleton for CaseWise:
+You'll learn the basic contract skeleton for CaseWise:
 
 dependency header
 GenLayer import
@@ -52,7 +52,6 @@ class CaseWise(gl.Contract):
         self.owner = gl.message.sender_address
         self.court_name = "CaseWise"
         self.court_rules = "Parties submit cases and evidence for AI-assisted review."
-No callable output yet. The platform checks the state fields and constructor.
 `,
   task: `Add a persistent field:
 

@@ -7,7 +7,7 @@ const content: LessonContent = {
 
 ### What You'll Learn
 
-Students learn validation for dispute case creation.
+You'll learn validation for dispute case creation.
 
 A case should not have:
 
@@ -19,17 +19,39 @@ zero fee`,
 
 from genlayer import *
 
-# Continue building your contract — add the method described in the task
-`,
-  expectedCode: `Empty title fails with:
 
-Title cannot be empty
-Empty claim fails with:
+class CaseWise(gl.Contract):
+    owner: Address
+    court_name: str
+    court_rules: str
 
-Claim cannot be empty
-Same claimant/respondent fails with:
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.court_name = "CaseWise"
+        self.court_rules = "Parties submit cases and evidence for AI-assisted review."
 
-Claimant and respondent must be different
+    @gl.public.view
+    def get_court_name(self) -> str:
+        return self.court_name
+
+    @gl.public.view
+    def get_court_rules(self) -> str:
+        return self.court_rules
+
+    @gl.public.view
+    def get_owner(self) -> str:
+        return self.owner.as_hex
+
+    @gl.public.view
+    def get_contract_summary(self) -> str:
+        return self.court_name + ": " + self.court_rules
+
+    @gl.public.write
+    def update_court_rules(self, new_rules: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can update rules"
+        assert len(new_rules) > 0, "Rules cannot be empty"
+
+        self.court_rules = new_rules
 `,
   task: `Add validation to submit_case.
 
@@ -56,7 +78,7 @@ def submit_case(self, title: str, claim: str, respondent: Address, case_fee: u25
   hints: [
     "Add validation to submit_case.",
     "Expected method",
-    "Key line: `Empty title fails with:`",
+    "Check the expected code — the solution is there.",
   ],
 };
 

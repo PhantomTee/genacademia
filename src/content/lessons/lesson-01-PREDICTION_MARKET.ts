@@ -7,7 +7,7 @@ const content: LessonContent = {
 
 ### What You'll Learn
 
-Students learn what a prediction market is, why normal smart contracts struggle with real-world outcomes, and why GenLayer is useful for contracts that need to reason about language, evidence, and real-world events.
+You'll learn what a prediction market is, why normal smart contracts struggle with real-world outcomes, and why GenLayer is useful for contracts that need to reason about language, evidence, and real-world events.
 
 They do not write a full contract yet. They inspect the final direction and complete a tiny starter check so the platform knows they understand the project.
 
@@ -50,20 +50,13 @@ class PredictX(gl.Contract):
     def get_project_name(self) -> str:
         return self.project_name
 `,
-  expectedCode: `Calling:
-
-get_project_name()
-should return:
-
-PredictX: AI-Resolved Prediction Market
-`,
   task: `Change the project name from "PredictX" to:
 
 PredictX: AI-Resolved Prediction Market`,
   hints: [
     "Change the project name from 'PredictX' to:.",
     "PredictX: AI-Resolved Prediction Market",
-    "Key line: `Calling:`",
+    "Check the expected code — the solution is there.",
   ],
 };
 

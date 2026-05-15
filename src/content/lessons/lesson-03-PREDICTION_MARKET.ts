@@ -7,7 +7,7 @@ const content: LessonContent = {
 
 ### What You'll Learn
 
-Students learn how to expose read-only contract state using @gl.public.view.
+You'll learn how to expose read-only contract state using @gl.public.view.
 
 ### How It Works
 
@@ -63,13 +63,6 @@ class PredictX(gl.Contract):
     @gl.public.view
     def get_owner(self) -> str:
         return self.owner.as_hex
-get_platform_name() returns:
-
-PredictX
-get_platform_description() returns:
-
-A GenLayer prediction market that uses AI-assisted resolution.
-get_owner() returns a wallet address string.
 `,
   task: `Add two new view methods:
 

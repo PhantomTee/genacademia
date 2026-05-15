@@ -7,7 +7,7 @@ const content: LessonContent = {
 
 ### What You'll Learn
 
-Students learn how to expose court metadata with @gl.public.view.
+You'll learn how to expose court metadata with @gl.public.view.
 
 The frontend needs to show:
 
@@ -59,9 +59,6 @@ class CaseWise(gl.Contract):
     @gl.public.view
     def get_owner(self) -> str:
         return self.owner.as_hex
-get_court_name() → CaseWise
-get_court_rules() → Parties submit cases and evidence for AI-assisted review.
-get_owner() → 0x...
 `,
   task: `Add two view methods:
 

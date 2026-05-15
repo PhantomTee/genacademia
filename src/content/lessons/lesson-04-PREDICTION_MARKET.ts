@@ -7,7 +7,7 @@ const content: LessonContent = {
 
 ### What You'll Learn
 
-Students learn how to modify state using @gl.public.write, and why write methods need permission checks.
+You'll learn how to modify state using @gl.public.write, and why write methods need permission checks.
 
 Writing to Intelligent Contracts modifies state and needs network processing, unlike read calls.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
@@ -70,15 +70,6 @@ class PredictX(gl.Contract):
         assert len(new_description) > 0, "Description cannot be empty"
 
         self.platform_description = new_description
-After calling:
-
-update_platform_description("Markets resolved with AI-assisted evidence review.")
-then:
-
-get_platform_description()
-returns:
-
-Markets resolved with AI-assisted evidence review.
 `,
   task: `Add a write method:
 

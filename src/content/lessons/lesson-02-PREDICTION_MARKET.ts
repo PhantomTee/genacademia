@@ -7,7 +7,7 @@ const content: LessonContent = {
 
 ### What You'll Learn
 
-Students learn the basic structure of a GenLayer Intelligent Contract: dependency header, imports, class declaration, typed state variables, and constructor.
+You'll learn the basic structure of a GenLayer Intelligent Contract: dependency header, imports, class declaration, typed state variables, and constructor.
 
 They create the first real contract skeleton with an owner and a platform name.
 
@@ -51,7 +51,6 @@ class PredictX(gl.Contract):
         self.owner = gl.message.sender_address
         self.platform_name = "PredictX"
         self.platform_description = "A GenLayer prediction market that uses AI-assisted resolution."
-No method is called yet. The platform checks that state fields exist.
 `,
   task: `Add a second persistent field:
 

@@ -17,14 +17,19 @@ const REAL_HASH = "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz0
 
 // ── Section header patterns (order matters for the state machine) ─────────────
 const SECTION_PATTERNS = [
-  { key: "FINAL_CONTRACT", re: /^Final \w.* contract$/ },
-  { key: "STARTER_CODE",   re: /^Starter code$/ },
-  { key: "EXPLANATION",    re: /^Explanation$/ },
-  { key: "WHAT_LEARN",     re: /^What students learn$/ },
-  { key: "WHAT_DO",        re: /^What they (do|build)$/ },
-  { key: "TASK",           re: /^Student task$/ },
-  { key: "EXPECTED",       re: /^Expected (final code|code addition|code|output)$/ },
-  { key: "VERIFICATION",   re: /^Platform verification$/ },
+  { key: "FINAL_CONTRACT",   re: /^Final \w.* contract$/ },
+  { key: "STARTER_CODE",     re: /^Starter code$/ },
+  { key: "EXPLANATION",      re: /^Explanation$/ },
+  { key: "WHAT_LEARN",       re: /^What students learn$/ },
+  { key: "WHAT_DO",          re: /^What they (do|build)$/ },
+  { key: "TASK",             re: /^Student task$/ },
+  // Must come BEFORE the broader EXPECTED pattern
+  { key: "EXPECTED_OUTPUT",  re: /^Expected output$/ },
+  // "Expected final code", "Expected final code after Lesson N", "Expected code addition(s)",
+  // "Expected code for X", "Expected code", "Code additions", "Expected code additions"
+  { key: "EXPECTED",         re: /^(Expected (final code|code additions?|code for \w+|code)|Code additions?)(\s+after Lesson \d+)?$/ },
+  { key: "WHAT_LEARN",       re: /^New concept$/ },
+  { key: "VERIFICATION",     re: /^Platform verification$/ },
 ];
 
 function detectSection(line) {
@@ -83,6 +88,7 @@ function parseLessonSections(lines) {
     EXPLANATION: [],
     TASK: [],
     EXPECTED: [],
+    EXPECTED_OUTPUT: [],
     VERIFICATION: [],
     OTHER: [],
   };
@@ -137,7 +143,10 @@ function fixHash(code) {
 function buildExplanation(title, lessonId, sections) {
   const parts = [`## Lesson ${lessonId} — ${title}`, ""];
 
-  const whatLearn = sections.WHAT_LEARN.join("\n").trim();
+  const whatLearn = sections.WHAT_LEARN.join("\n").trim()
+    .replace(/^Students? learn/gim, "You'll learn")
+    .replace(/^Students? (build|combine|add|implement|use|work with|explore|see|practice|understand)/gim,
+             (_, verb) => `You'll ${verb}`);
   if (whatLearn) {
     parts.push("### What You'll Learn", "", whatLearn, "");
   }
@@ -211,6 +220,18 @@ function extractCode(lines) {
   return fixHash(trimmed) + "\n";
 }
 
+// ── Checks whether a string looks like actual Python contract code ─────────────
+function looksLikePython(code) {
+  if (!code || code.trim().length < 20) return false;
+  return (
+    /from genlayer/.test(code) ||
+    /class \w+\(gl\.Contract\)/.test(code) ||
+    /def __init__/.test(code) ||
+    /^# \{/.test(code.trim()) ||
+    /@gl\.public/.test(code)
+  );
+}
+
 // ── Generate 3 contextual hints ───────────────────────────────────────────────
 function generateHints(taskText, expectedLines) {
   const taskLines = taskText.split("\n").filter(l => l.trim());
@@ -239,19 +260,23 @@ function generateHints(taskText, expectedLines) {
 }
 
 // ── Build the TypeScript file content ─────────────────────────────────────────
-function buildTsFile(lessonId, projectPath, title, sections) {
-  const starterLines = sections.STARTER_CODE.length > 0
-    ? sections.STARTER_CODE
-    : sections.FINAL_CONTRACT;
+function buildTsFile(lessonId, projectPath, title, sections, cumulativeCode) {
+  // Try STARTER_CODE section first, then FINAL_CONTRACT as fallback
+  const starterRaw = sections.STARTER_CODE.length > 0
+    ? extractCode(sections.STARTER_CODE)
+    : extractCode(sections.FINAL_CONTRACT);
 
-  const starterCode = extractCode(starterLines) ||
-    `# { "Depends": "${REAL_HASH}" }\n\nfrom genlayer import *\n\n# Continue building your contract — add the method described in the task\n`;
+  // Use cumulative code when the section doesn't contain real Python
+  const starterCode = looksLikePython(starterRaw)
+    ? starterRaw
+    : (cumulativeCode ||
+       `# { "Depends": "${REAL_HASH}" }\n\nfrom genlayer import *\n\n# Continue building your contract\n`);
 
   // Expected code: prefer EXPECTED section, fall back to FINAL_CONTRACT
   const expectedRaw = sections.EXPECTED.length > 0
     ? extractCode(sections.EXPECTED)
     : extractCode(sections.FINAL_CONTRACT);
-  const expectedCode = expectedRaw && expectedRaw !== starterCode ? expectedRaw : null;
+  const expectedCode = looksLikePython(expectedRaw) && expectedRaw !== starterCode ? expectedRaw : null;
 
   const explanation = buildExplanation(title, lessonId, sections);
 
@@ -328,9 +353,24 @@ for (const { marker, projectPath } of TRACKS) {
   const lessons = extractTrackLessons(gistContent, marker);
   console.log(`   Found ${lessons.length} lessons`);
 
+  let cumulativeCode = ""; // updated from FINAL_CONTRACT sections across lessons
+
   for (const lesson of lessons) {
     const sections = parseLessonSections(lesson.lines);
-    const tsContent = buildTsFile(lesson.lessonId, projectPath, lesson.title, sections);
+
+    // Update cumulative code from any section that contains a complete contract
+    const isComplete = (code) =>
+      /class \w+\(gl\.Contract\)/.test(code) && /def __init__/.test(code);
+
+    const starterFull = extractCode(sections.STARTER_CODE);
+    const expectedFull = extractCode(sections.EXPECTED);
+    const finalFull = extractCode(sections.FINAL_CONTRACT);
+
+    if (isComplete(finalFull)) cumulativeCode = finalFull;
+    else if (isComplete(expectedFull)) cumulativeCode = expectedFull;
+    else if (isComplete(starterFull)) cumulativeCode = starterFull;
+
+    const tsContent = buildTsFile(lesson.lessonId, projectPath, lesson.title, sections, cumulativeCode);
     const filePath = writeLessonFile(lesson.lessonId, projectPath, tsContent);
     const rel = filePath.replace(ROOT, "").replace(/\\/g, "/");
     console.log(`   ✓ ${rel}`);
