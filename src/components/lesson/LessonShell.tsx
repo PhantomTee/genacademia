@@ -76,7 +76,6 @@ export function LessonShell({ lesson, content }: Props) {
               <CodeEditor
                 value={code}
                 onChange={setCode}
-                onReset={() => setCode(content.starterCode)}
                 starterCode={content.starterCode}
               />
             )}
@@ -150,7 +149,6 @@ export function LessonShell({ lesson, content }: Props) {
             <CodeEditor
               value={code}
               onChange={setCode}
-              onReset={() => setCode(content.starterCode)}
               starterCode={content.starterCode}
             />
           )}

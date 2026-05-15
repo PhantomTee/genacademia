@@ -216,7 +216,8 @@ function ensureRegistered(monaco: Monaco) {
   // Completions
   monaco.languages.registerCompletionItemProvider("python", {
     triggerCharacters: [".", "@"],
-    provideCompletionItems(model, position) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    provideCompletionItems(model: any, position: any) {
       const word = model.getWordUntilPosition(position);
       const range = {
         startLineNumber: position.lineNumber,
@@ -244,7 +245,8 @@ function ensureRegistered(monaco: Monaco) {
 
   // Hover
   monaco.languages.registerHoverProvider("python", {
-    provideHover(model, position) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    provideHover(model: any, position: any) {
       const line = model.getLineContent(position.lineNumber);
       for (const [key, value] of Object.entries(HOVER)) {
         if (line.includes(key)) {

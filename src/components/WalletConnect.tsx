@@ -15,7 +15,7 @@ const btnOutline =
   btnBase +
   " border-ink/20 dark:border-cream-200/20 hover:border-ink dark:hover:border-cream-200 text-ink dark:text-cream-200";
 
-const ALLOWED_CHAINS = [studionetChain.id, localnetChain.id];
+const ALLOWED_CHAINS: number[] = [studionetChain.id, localnetChain.id];
 
 export function WalletConnect() {
   const { address, isConnected, chainId } = useAccount();

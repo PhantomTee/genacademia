@@ -14,7 +14,6 @@ export function useGenLayerClient(network: NetworkTarget = "studionet") {
 
   return createClient({
     chain,
-    // @ts-expect-error — genlayer-js accepts EIP-1193 providers; wagmi's connectorClient is compatible
     provider: connectorClient,
   });
 }
