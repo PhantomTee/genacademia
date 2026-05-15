@@ -21,7 +21,7 @@ interface Props {
 }
 
 export function LessonShell({ lesson, content }: Props) {
-  const { data: session } = useSession();
+  useSession();
   const [code, setCode] = useState(content.starterCode);
   const [activeTab, setActiveTab] = useState<Tab>("deploy");
   const [contractAddress, setContractAddress] = useState("");

@@ -38,7 +38,7 @@ export async function PATCH(req: NextRequest) {
     }),
     prisma.user.update({
       where: { id: user.id },
-      data: { projectPath: projectPath as any },
+      data: { projectPath: projectPath as import("@prisma/client").ProjectPath },
     }),
   ]);
 

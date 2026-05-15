@@ -73,7 +73,7 @@ export async function runVerification(
 
   let actual: unknown;
   try {
-    actual = await (client as any).readContract({
+    actual = await (client as unknown as { readContract: (o: { address: string; functionName: string; args: unknown[] }) => Promise<unknown> }).readContract({
       address: contractAddress,
       functionName: spec.method,
       args: spec.args,

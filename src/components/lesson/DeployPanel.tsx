@@ -41,12 +41,12 @@ export function DeployPanel({ lessonId, code, onDeployed }: Props) {
     setStatusLabel("Deploying...");
 
     try {
-      const hash = await (glClient as any).deployContract({ code, args: [] });
+      const hash = await (glClient as unknown as { deployContract: (o: { code: string; args: unknown[] }) => Promise<string> }).deployContract({ code, args: [] });
       setTxHash(hash);
       setState("polling");
       setStatusLabel(STATUS_LABELS.PENDING);
 
-      const receipt = await (glClient as any).waitForTransactionReceipt({ hash });
+      const receipt = await (glClient as unknown as { waitForTransactionReceipt: (o: { hash: string }) => Promise<Record<string, string>> }).waitForTransactionReceipt({ hash });
       const address = receipt?.contractAddress ?? receipt?.contract_address ?? "";
       setContractAddress(address);
       setStatusLabel(STATUS_LABELS.FINALIZED);

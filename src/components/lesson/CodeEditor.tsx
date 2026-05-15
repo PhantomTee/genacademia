@@ -13,11 +13,10 @@ const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
 interface Props {
   value: string;
   onChange: (value: string) => void;
-  onReset: () => void;
   starterCode: string;
 }
 
-export function CodeEditor({ value, onChange, onReset, starterCode }: Props) {
+export function CodeEditor({ value, onChange, starterCode }: Props) {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   function handleReset() {

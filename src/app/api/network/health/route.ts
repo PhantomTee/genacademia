@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { NETWORK_CONFIG } from "@/lib/genlayer/constants";
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   const session = await getServerSession(authOptions);
   const network =
     (session?.user?.networkTarget as "studionet" | "localnet") ?? "studionet";

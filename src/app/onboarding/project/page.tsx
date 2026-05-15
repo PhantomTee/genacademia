@@ -67,7 +67,7 @@ export default function ProjectPage() {
       </div>
 
       <div className="space-y-0">
-        {PATHS.map((path, idx) => (
+        {PATHS.map((path) => (
           <button
             key={path.id}
             onClick={() => setSelected(path.id)}

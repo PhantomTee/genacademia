@@ -19,7 +19,6 @@ export default async function CheatsheetPage() {
   const maxCompleted = completedIds.length > 0 ? Math.max(...completedIds) : 0;
 
   const unlocked = CHEATSHEET.filter((e) => e.unlockedByLesson <= maxCompleted);
-  const locked = CHEATSHEET.filter((e) => e.unlockedByLesson > maxCompleted);
   const categories = Array.from(new Set(CHEATSHEET.map((e) => e.category)));
 
   return (
