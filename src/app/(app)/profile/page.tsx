@@ -193,7 +193,7 @@ export default async function ProfilePage() {
                   </div>
                   {p.txHash && (
                     <a
-                      href={`https://studio.genlayer.com/transactions/${p.txHash}`}
+                      href={`https://explorer-studio.genlayer.com/tx/${p.txHash}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-[10px] font-bold uppercase tracking-widest text-ink/40 dark:text-cream-200/40 hover:text-ink dark:hover:text-cream-200 transition-colors flex-shrink-0"

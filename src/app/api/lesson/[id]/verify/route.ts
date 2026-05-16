@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { runVerification, runStaticVerification } from "@/lib/genlayer/verify";
+import { runStaticVerification } from "@/lib/genlayer/static-verify";
 import { getSpec } from "@/lib/curriculum/specs";
 import type { ProjectPath } from "@/lib/curriculum/metadata";
 
@@ -46,7 +46,10 @@ export async function POST(
 
   const lessonId = parseInt(params.id, 10);
   const body = await req.json();
-  const { contractAddress, code } = body as { contractAddress?: string; code?: string };
+  const { contractAddress, code } = body as {
+    contractAddress?: string;
+    code?: string;
+  };
   const projectPath = session.user.projectPath as ProjectPath;
 
   const spec = await getSpec(lessonId, projectPath);
@@ -54,41 +57,20 @@ export async function POST(
     return NextResponse.json({ error: "No spec for this lesson" }, { status: 404 });
   }
 
-  // Run static analysis if code was submitted
-  let staticResult: { passed: boolean; failures: string[] } | undefined;
-  if (code) {
-    staticResult = runStaticVerification(code, spec.staticChecks ?? {});
+  if (!code?.trim()) {
+    return NextResponse.json({
+      success: false,
+      message: "Paste or edit your code first so the checklist can inspect it.",
+    });
   }
 
-  // Run RPC verification if contract address provided; fall back to static-only
-  let rpcResult: Awaited<ReturnType<typeof runVerification>> | undefined;
-  if (contractAddress) {
-    try {
-      rpcResult = await runVerification(contractAddress, spec);
-    } catch {
-      // RPC unavailable — static check is sufficient fallback
-    }
-  }
-
-  // If both code and a deployed address are supplied, both checks must pass.
-  const staticPassed = staticResult?.passed ?? false;
-  const rpcPassed = rpcResult?.success ?? false;
-  const hasEvidence = Boolean(code || contractAddress);
-  const success =
-    hasEvidence &&
-    (code ? staticPassed : true) &&
-    (contractAddress ? rpcPassed : true);
-
-  const message =
-    code && !staticPassed && staticResult
-      ? `Code analysis failed: ${staticResult.failures.join("; ")}`
-      : contractAddress && !rpcPassed
-      ? rpcResult?.message ?? "Contract verification failed or RPC was unavailable."
-      : rpcPassed
-      ? rpcResult!.message
-      : staticPassed
-      ? "Code analysis passed - all required concepts found."
-      : "No contract address and no code submitted.";
+  const staticResult = runStaticVerification(code, spec.staticChecks ?? {});
+  const success = staticResult.passed;
+  const message = success
+    ? `Code checklist passed with a score of ${staticResult.score}%.`
+    : `Code checklist scored ${staticResult.score}%. ${
+        staticResult.nextStep ?? "Review the failed checks below."
+      }`;
 
   if (success) {
     const { getLesson, getLessonsInGroup } = await import(
@@ -139,7 +121,6 @@ export async function POST(
     return NextResponse.json({
       success,
       message,
-      actual: rpcResult?.actual,
       staticResult,
       badgeAwarded,
     });

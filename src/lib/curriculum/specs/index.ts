@@ -31,11 +31,13 @@ const SHAPE_LABELS: Record<string, string> = {
 export async function getHumanSpec(
   lessonId: number,
   projectPath: ProjectPath
-): Promise<{ method: string; humanExpected: string } | null> {
+): Promise<{ method?: string; humanExpected: string } | null> {
   const spec = await getSpec(lessonId, projectPath);
   if (!spec) return null;
   return {
     method: spec.method,
-    humanExpected: SHAPE_LABELS[spec.expectedShape] ?? spec.expectedShape,
+    humanExpected: spec.expectedShape
+      ? SHAPE_LABELS[spec.expectedShape] ?? spec.expectedShape
+      : "code checklist",
   };
 }

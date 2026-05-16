@@ -26,6 +26,12 @@ export async function POST(
   if (!spec) {
     return NextResponse.json({ error: "No spec for this lesson" }, { status: 404 });
   }
+  if (!spec.method) {
+    return NextResponse.json(
+      { error: "This lesson only has a code checklist." },
+      { status: 400 }
+    );
+  }
 
   const client = getGenLayerClient();
   try {
@@ -34,7 +40,7 @@ export async function POST(
     }).readContract({
       address: contractAddress,
       functionName: spec.method,
-      args: spec.args,
+      args: spec.args ?? [],
     });
     return NextResponse.json({ result });
   } catch (err) {

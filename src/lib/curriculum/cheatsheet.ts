@@ -116,7 +116,7 @@ count: u32 = 0
 balance: u256 = 0`,
     description:
       "Unsigned integer types with fixed bit widths. Use u256 for token amounts.",
-    docUrl: "https://docs.genlayer.com/developers/intelligent-contracts/types",
+    docUrl: "https://docs.genlayer.com/developers/intelligent-contracts/types/primitive",
     unlockedByLesson: 4,
   },
   {
