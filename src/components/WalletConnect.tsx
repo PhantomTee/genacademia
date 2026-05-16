@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useAccount, useConnect, useDisconnect, useConnectors, useSwitchChain } from "wagmi";
 import { useSession, signOut } from "next-auth/react";
 import { useSiweAuth } from "@/hooks/useSiweAuth";
@@ -26,6 +27,21 @@ export function WalletConnect() {
   const { data: session } = useSession();
   const { signInWithEthereum, isLoading: isSigningIn, error: signInError } = useSiweAuth();
   const router = useRouter();
+
+  // Sign out automatically when the wallet account changes mid-session.
+  // Without this, session.user.walletAddress stays stale and the user sees
+  // data belonging to their previously signed-in wallet.
+  const prevAddress = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!session?.user?.walletAddress) {
+      prevAddress.current = address;
+      return;
+    }
+    if (prevAddress.current !== undefined && address !== prevAddress.current) {
+      signOut({ redirect: false });
+    }
+    prevAddress.current = address;
+  }, [address, session?.user?.walletAddress]);
 
   async function handleSignIn() {
     if (!address || !chainId) return;
