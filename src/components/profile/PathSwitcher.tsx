@@ -4,11 +4,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 const PATHS = [
-  { value: "PREDICTION_MARKET", label: "Prediction Market" },
-  { value: "FREELANCE_ESCROW", label: "Freelance Escrow" },
-  { value: "DAO", label: "DAO" },
-  { value: "DEVELOPER_REPUTATION", label: "Developer Reputation" },
-  { value: "INSURANCE", label: "Insurance" },
+  { value: "PREDICTION_MARKET", label: "PredictX" },
+  { value: "FREELANCE_ESCROW", label: "TrustLance" },
+  { value: "DAO", label: "GovMind" },
+  { value: "DEVELOPER_REPUTATION", label: "CodeVault" },
+  { value: "INSURANCE", label: "CaseWise" },
 ] as const;
 
 export function PathSwitcher({ currentPath }: { currentPath: string }) {
@@ -36,41 +36,45 @@ export function PathSwitcher({ currentPath }: { currentPath: string }) {
     router.refresh();
   }
 
+  const pendingLabel = PATHS.find((p) => p.value === pendingPath)?.label;
+
   return (
     <>
       <select
         value={currentPath}
         disabled={loading}
         onChange={(e) => handleSelect(e.target.value)}
-        className="bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        className="text-xs font-bold uppercase tracking-widest px-3 py-2 border border-ink/30 dark:border-cream-200/30 bg-transparent text-ink dark:text-cream-200 focus:outline-none focus:border-ink dark:focus:border-cream-200 disabled:opacity-40 cursor-pointer"
       >
         {PATHS.map((p) => (
-          <option key={p.value} value={p.value}>
+          <option key={p.value} value={p.value} className="bg-cream-200 dark:bg-ink text-ink dark:text-cream-200">
             {p.label}
           </option>
         ))}
       </select>
 
       {showConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 max-w-sm w-full mx-4">
-            <h3 className="text-white font-semibold text-lg mb-2">
-              Switch Project Path?
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 dark:bg-cream-200/10 backdrop-blur-sm">
+          <div className="bg-cream-200 dark:bg-ink border border-ink dark:border-cream-200 p-6 max-w-sm w-full mx-4">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-ink/40 dark:text-cream-200/40 mb-3">
+              Confirm switch
+            </div>
+            <h3 className="text-lg font-black uppercase text-ink dark:text-cream-200 mb-2">
+              Switch to {pendingLabel}?
             </h3>
-            <p className="text-gray-400 text-sm mb-6">
-              Switching path will reset all your progress and badges for the
-              current path. This cannot be undone.
+            <p className="text-sm text-ink/60 dark:text-cream-200/60 mb-6 leading-relaxed">
+              Your progress and badges for the current path will be reset. This cannot be undone.
             </p>
-            <div className="flex gap-3">
+            <div className="flex gap-0">
               <button
                 onClick={() => setShowConfirm(false)}
-                className="flex-1 py-2 rounded-lg border border-gray-700 text-gray-300 text-sm hover:bg-gray-800"
+                className="flex-1 py-2.5 text-xs font-bold uppercase tracking-widest border border-ink/30 dark:border-cream-200/30 text-ink/60 dark:text-cream-200/60 hover:border-ink dark:hover:border-cream-200 hover:text-ink dark:hover:text-cream-200 transition-all"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmSwitch}
-                className="flex-1 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-medium"
+                className="flex-1 py-2.5 text-xs font-bold uppercase tracking-widest border border-ink dark:border-cream-200 bg-ink dark:bg-cream-200 text-cream-200 dark:text-ink hover:opacity-80 transition-opacity -ml-px"
               >
                 Switch & Reset
               </button>
