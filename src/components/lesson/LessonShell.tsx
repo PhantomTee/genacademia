@@ -206,8 +206,10 @@ export function LessonShell({ lesson, content, prevCode }: Props) {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`relative flex-1 py-2 text-xs font-medium ${
-                activeTab === tab.id ? "text-white bg-ink/5 dark:bg-cream-200/5" : "text-gray-500"
+              className={`relative flex-1 py-2.5 text-xs font-bold uppercase tracking-wider transition-colors ${
+                activeTab === tab.id
+                  ? "text-ink dark:text-cream-200 border-b-2 border-ink dark:border-cream-200"
+                  : "text-ink/40 dark:text-cream-200/40"
               }`}
             >
               {tab.label}

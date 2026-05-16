@@ -26,8 +26,8 @@ export interface GenLayerReadClient {
   getTransaction: (args: { hash: `0x${string}` }) => Promise<GenLayerTransaction>;
 }
 
-export async function connectStudionet(client: GenLayerWriteClient) {
-  await client.connect?.("studionet");
+export async function connectStudionet(_client: GenLayerWriteClient) {
+  // no-op: connect() is MetaMask Snap only, not needed for EIP-1193 provider clients
 }
 
 export async function waitForFinalizedSuccess(
@@ -36,11 +36,11 @@ export async function waitForFinalizedSuccess(
 ) {
   const receipt = await client.waitForTransactionReceipt({
     hash,
-    status: TransactionStatus.FINALIZED,
+    status: TransactionStatus.ACCEPTED,
   });
 
   if (receipt.txExecutionResultName === ExecutionResult.FINISHED_WITH_ERROR) {
-    throw new Error("Transaction finalized but contract execution failed.");
+    throw new Error("Transaction accepted but contract execution failed.");
   }
 
   return receipt;

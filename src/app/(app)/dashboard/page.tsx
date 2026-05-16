@@ -37,7 +37,7 @@ export default async function DashboardPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-10">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
       <div className="mb-10 flex items-start justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-black uppercase text-ink dark:text-cream-200">Your Curriculum</h1>

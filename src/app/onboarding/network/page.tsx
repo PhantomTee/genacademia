@@ -21,7 +21,7 @@ export default function NetworkPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-16">
+    <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
       <div className="mb-10">
         <span className="inline-block px-2 py-0.5 text-xs font-bold uppercase tracking-widest border border-ink/20 dark:border-cream-200/20 text-ink/40 dark:text-cream-200/40 mb-4">
           Step 3 of 3

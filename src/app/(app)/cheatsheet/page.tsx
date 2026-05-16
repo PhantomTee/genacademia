@@ -22,7 +22,7 @@ export default async function CheatsheetPage() {
   const categories = Array.from(new Set(CHEATSHEET.map((e) => e.category)));
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-10">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-white">Cheat Sheet</h1>
         <p className="text-gray-400 mt-1">

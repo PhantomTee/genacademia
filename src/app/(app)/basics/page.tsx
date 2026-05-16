@@ -22,7 +22,7 @@ export default function BasicsPage() {
   const nextLesson = BASICS_LESSONS.find((l) => !completed.has(l.id));
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-12">
+    <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
       <div className="mb-10">
         <h1 className="text-3xl font-black uppercase text-ink dark:text-cream-200">
           Basics

@@ -53,7 +53,7 @@ export default function ProjectPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-16">
+    <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
       <div className="mb-10">
         <span className="inline-block px-2 py-0.5 text-xs font-bold uppercase tracking-widest border border-ink/20 dark:border-cream-200/20 text-ink/40 dark:text-cream-200/40 mb-4">
           Step 2 of 3
@@ -77,7 +77,7 @@ export default function ProjectPage() {
                 : "border-ink/15 dark:border-cream-200/15 hover:border-ink/40 dark:hover:border-cream-200/40"
             }`}
           >
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4">
               <div>
                 <div
                   className={`text-lg font-black uppercase tracking-tight ${
@@ -99,7 +99,7 @@ export default function ProjectPage() {
                 </div>
               </div>
               <span
-                className={`flex-shrink-0 text-xs font-bold uppercase tracking-widest px-2 py-0.5 border mt-0.5 ${
+                className={`self-start flex-shrink-0 text-xs font-bold uppercase tracking-widest px-2 py-0.5 border ${
                   selected === path.id
                     ? "border-cream-200/30 dark:border-ink/30 text-cream-200/70 dark:text-ink/70"
                     : "border-ink/20 dark:border-cream-200/20 text-ink/40 dark:text-cream-200/40"
