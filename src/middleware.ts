@@ -45,6 +45,8 @@ export const config = {
     "/lesson/:path*",
     "/profile/:path*",
     "/cheatsheet/:path*",
+    "/hello-genlayer",
+    "/hello-genlayer/:path*",
     "/onboarding/:path*",
     "/basics",
     "/basics/:path*",

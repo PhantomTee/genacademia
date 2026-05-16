@@ -13,9 +13,5 @@ export default async function AppLayout({
     redirect("/");
   }
 
-  if (!session.user.projectPath) {
-    redirect("/onboarding/experience");
-  }
-
   return <>{children}</>;
 }
