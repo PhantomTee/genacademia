@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { WalletConnect } from "@/components/WalletConnect";
+import { FaucetButton } from "@/components/FaucetButton";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 export function Navbar() {
@@ -37,6 +38,7 @@ export function Navbar() {
       {/* Right side */}
       <div className="flex items-center gap-0">
         <ThemeToggle />
+        {session && <FaucetButton />}
         <WalletConnect />
       </div>
     </nav>

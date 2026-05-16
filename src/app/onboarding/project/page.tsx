@@ -25,14 +25,14 @@ const PATHS = [
   {
     id: "DEVELOPER_REPUTATION",
     brand: "CodeVault",
-    tagline: "On-chain reputation scored by AI from real contributions.",
-    feature: "AI contribution scoring",
+    tagline: "Private code marketplace where AI evaluates listing quality before funds release.",
+    feature: "AI quality review",
   },
   {
     id: "INSURANCE",
     brand: "CaseWise",
-    tagline: "Parametric insurance that pays out automatically on verified claims.",
-    feature: "AI claims assessment",
+    tagline: "On-chain dispute resolution where AI reviews evidence and issues rulings.",
+    feature: "AI arbitration",
   },
 ];
 
