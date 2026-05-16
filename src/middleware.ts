@@ -4,7 +4,7 @@ import type { NextRequest } from "next/server";
 
 const PROTECTED = ["/dashboard", "/lesson", "/profile", "/cheatsheet"];
 const ONBOARDING = ["/onboarding"];
-const HELLO_PATH = "/hello-genlayer";
+const BASICS_PATH = "/basics";
 
 export async function middleware(req: NextRequest) {
   const token = await getToken({ req });
@@ -12,33 +12,28 @@ export async function middleware(req: NextRequest) {
 
   const isProtected = PROTECTED.some((p) => path.startsWith(p));
   const isOnboarding = ONBOARDING.some((p) => path.startsWith(p));
-  const isHello = path.startsWith(HELLO_PATH);
+  const isBasics = path === BASICS_PATH || path.startsWith(BASICS_PATH + "/");
 
-  // Not logged in → send to landing
-  if (!token && (isProtected || isHello)) {
+  // Not logged in → landing
+  if (!token && (isProtected || isBasics)) {
     return NextResponse.redirect(new URL("/", req.url));
   }
 
-  // Logged in but no track chosen → onboarding
-  if (token && !token.projectPath && isProtected) {
+  // Logged in + no track → onboarding
+  if (token && !token.projectPath && (isProtected || isBasics)) {
     return NextResponse.redirect(new URL("/onboarding/experience", req.url));
   }
 
-  // Logged in with track → skip onboarding
+  // Logged in + has track → skip onboarding
   if (token && token.projectPath && isOnboarding) {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
-  const helloComplete = req.cookies.get("ga-hello")?.value === "1";
+  const basicsComplete = req.cookies.get("ga-basics")?.value === "1";
 
-  // Logged in with track but haven't done hello → force hello
-  if (token && token.projectPath && !helloComplete && isProtected) {
-    return NextResponse.redirect(new URL(HELLO_PATH, req.url));
-  }
-
-  // Already done hello → skip hello page
-  if (token && token.projectPath && helloComplete && isHello) {
-    return NextResponse.redirect(new URL("/dashboard", req.url));
+  // Logged in + has track + hasn't done basics → force /basics (but allow /basics itself)
+  if (token && token.projectPath && !basicsComplete && isProtected) {
+    return NextResponse.redirect(new URL(BASICS_PATH, req.url));
   }
 
   return NextResponse.next();
@@ -51,7 +46,7 @@ export const config = {
     "/profile/:path*",
     "/cheatsheet/:path*",
     "/onboarding/:path*",
-    "/hello-genlayer/:path*",
-    "/hello-genlayer",
+    "/basics",
+    "/basics/:path*",
   ],
 };

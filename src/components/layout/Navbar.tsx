@@ -23,6 +23,7 @@ export function Navbar() {
       <div className="hidden md:flex items-center gap-0">
         {session ? (
           <>
+            <NavLink href="/basics">Basics</NavLink>
             <NavLink href="/dashboard">Learn</NavLink>
             <NavLink href="/cheatsheet">Cheat Sheet</NavLink>
             <NavLink href="/profile">Profile</NavLink>
