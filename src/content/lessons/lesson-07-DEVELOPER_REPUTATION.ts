@@ -54,7 +54,7 @@ class CodeVault(gl.Contract):
         self.platform_description = "A GenLayer private code marketplace."
         self.listing_count = u256(0)
 `,
-  task: `Add a stub \`create_listing_stub(self, title: str) -> str\` that stores the caller in \`listing_sellers[str(self.listing_count)]\` and increments.`,
+  task: `Add the first version of \`create_listing(self, title: str) -> str\`. It should create a listing ID from \`str(self.listing_count)\`, store the caller in \`listing_sellers[listing_id]\`, increment \`listing_count\`, and return the listing ID.`,
   hints: [
     "Use gl.message.sender_address to capture the seller.",
     "Increment: self.listing_count = self.listing_count + u256(1).",

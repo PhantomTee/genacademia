@@ -59,7 +59,7 @@ class GovMind(gl.Contract):
         self.proposal_count = u256(0)
         self.members[self.owner.as_hex] = True
 `,
-  task: `Add all four proposal fields at class level. Add a stub \`create_proposal(self, title: str, description: str) -> str\` that stores the title, description, proposer, and status (set to "open"), then increments the counter.`,
+  task: `Add all four proposal fields at class level. Add the first version of \`create_proposal(self, title: str, description: str) -> str\` that stores the title, description, proposer, and status (set to "open"), then increments the counter.`,
   hints: [
     "Declare 4 TreeMap fields at class level.",
     "Set proposal_statuses[proposal_id] = 'open' in the creation method.",

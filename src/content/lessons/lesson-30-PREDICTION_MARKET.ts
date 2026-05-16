@@ -279,82 +279,26 @@ class PredictX(gl.Contract):
             "Allow winning users to claim",
             "Reject duplicate claims"
         ], sort_keys=True)
-Final expected platform verification
-{
-  capstone: "PredictX",
-  lesson: 30,
-  finalCapstone: true,
-  requiredClass: "PredictX",
-  requiredImports: ["import json", "from genlayer import *"],
-  requiredDecorators: [
-    "@gl.public.view",
-    "@gl.public.write",
-    "@gl.public.write.payable"
-  ],
-  requiredMethods: [
-    "get_platform_name",
-    "get_platform_description",
-    "get_owner",
-    "get_contract_summary",
-    "update_platform_description",
-    "create_market",
-    "get_market_json",
-    "get_active_markets_json",
-    "get_all_markets_json",
-    "close_market",
-    "stake_on_outcome",
-    "resolve_market_manually",
-    "resolve_with_ai",
-    "claim_winnings",
-    "get_frontend_actions_json",
-    "get_test_checklist_json"
-  ],
-  requiredState: [
-    "owner: Address",
-    "market_questions: TreeMap[str, str]",
-    "market_outcome_a: TreeMap[str, str]",
-    "market_outcome_b: TreeMap[str, str]",
-    "market_creators: TreeMap[str, Address]",
-    "market_min_stakes: TreeMap[str, u256]",
-    "market_statuses: TreeMap[str, str]",
-    "market_ids: DynArray[str]",
-    "market_count: u256",
-    "market_total_a: TreeMap[str, u256]",
-    "market_total_b: TreeMap[str, u256]",
-    "user_stakes_a: TreeMap[str, u256]",
-    "user_stakes_b: TreeMap[str, u256]",
-    "market_winning_outcome: TreeMap[str, str]",
-    "market_resolution_reason: TreeMap[str, str]",
-    "user_claimed: TreeMap[str, bool]"
-  ],
-  requiredStrings: [
-    "gl.message.sender_address",
-    "gl.message.value",
-    "json.dumps",
-    "gl.nondet.exec_prompt",
-    "Market already resolved",
-    "Already claimed",
-    "No winning stake found"
-  ],
-  expectedFlow: [
-    "create_market returns 0",
-    "get_market_json('0') includes status active",
-    "stake_on_outcome rejects creator staking",
-    "close_market changes status to closed",
-    "resolve_with_ai changes status to resolved",
-    "claim_winnings marks user_claimed true"
-  ]
-}
-This is Track 1 fully broken down. The next batch should be Track 2: TrustLance, with the same 30-lesson depth: code, explanation, expected task, expected output, and platform checks.
-
-
-Thought for 15s
 `,
-  task: ``,
+  task: `Deploy the final PredictX contract and verify the complete prediction-market flow.
+
+Before marking the capstone complete, confirm the contract can:
+
+- return identity data with get_platform_name, get_platform_description, get_owner, and get_contract_summary
+- create markets with validated outcomes and a minimum stake
+- list active and all markets as JSON
+- accept payable stakes from non-creators
+- close a market before resolution
+- resolve a closed market with AI using gl.vm.run_nondet_unsafe
+- store the winning outcome and resolution reason
+- allow winning users to claim once and reject duplicate claims
+- expose frontend action mappings and a test checklist
+
+After deployment, call get_platform_name() and at least one JSON view to prove the contract is reachable.`,
   hints: [
-    "Read the task description carefully — the change is small.",
-    "Look at the expected code section for the exact pattern to follow.",
-    "Check the expected code — the solution is there.",
+    "Use the final starter as the deployable contract; this lesson is about validation, not adding a new feature.",
+    "Test the lifecycle in order: create, stake, close, resolve, claim.",
+    "Key views to call after deploy: get_platform_name(), get_frontend_actions_json(), and get_test_checklist_json().",
   ],
 };
 

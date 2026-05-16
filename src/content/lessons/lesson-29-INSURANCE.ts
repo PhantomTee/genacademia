@@ -7,22 +7,9 @@ const content: LessonContent = {
 
 ### What You'll Learn
 
-Students assemble the full CaseWise contract.
+You'll assemble the full CaseWise contract and verify that every module from the previous lessons is present before the final deploy.
 
-They verify that all modules exist:
-
-identity
-case submission
-case indexing
-case JSON
-open/all case views
-case fee payment
-evidence submission
-manual ruling
-AI review
-appeal logic
-dispute rules
-test checklist`,
+By the end of this step, your contract should include identity views, case submission, case indexing, JSON views, fee payment, evidence submission, manual rulings, AI review, appeal logic, dispute rules, and a test checklist.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 from genlayer import *
@@ -92,11 +79,24 @@ class CaseWise(gl.Contract):
 
         return case_id
 `,
-  task: ``,
+  task: `Review your CaseWise contract and assemble the full capstone surface.
+
+Make sure the contract includes:
+
+- identity views: get_court_name, get_court_rules, get_owner, get_contract_summary
+- case creation: submit_case with title, claim, respondent, fee, claimant capture, and case_ids indexing
+- case reads: get_case_json, get_open_cases_json, get_all_cases_json
+- payment flow: pay_case_fee using @gl.public.write.payable and gl.message.value
+- evidence flow: add_evidence with claimant/respondent authorization
+- ruling flow: rule_case_manually and review_case_with_ai
+- appeal flow: appeal_case
+- helper views: get_dispute_rules_json and get_test_checklist_json
+
+Do not deploy yet. This lesson is the final assembly pass: fill any missing methods or state fields so Lesson 30 is only about deployment and verification.`,
   hints: [
-    "Read the task description carefully — the change is small.",
-    "Look at the expected code section for the exact pattern to follow.",
-    "Check the expected code — the solution is there.",
+    "Use the Lesson 30 CaseWise starter as your reference for the complete method list.",
+    "A complete capstone should include both AI review and manual owner ruling; AI review stores a recommendation but does not close the case.",
+    "Key methods to confirm: submit_case, pay_case_fee, add_evidence, review_case_with_ai, rule_case_manually, appeal_case.",
   ],
 };
 

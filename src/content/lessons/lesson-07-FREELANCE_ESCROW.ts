@@ -54,7 +54,7 @@ class TrustLance(gl.Contract):
         self.platform_description = "A GenLayer freelance escrow platform."
         self.job_count = u256(0)
 `,
-  task: `Add a method \`create_job_stub(self, title: str) -> str\` decorated with \`@gl.public.write\` that stores the caller's address in \`job_clients\` at key \`str(self.job_count)\` and increments the counter.`,
+  task: `Add the first version of \`create_job(self, title: str) -> str\` decorated with \`@gl.public.write\`. It should create a job ID from \`str(self.job_count)\`, store the caller's address in \`job_clients[job_id]\`, increment \`job_count\`, and return the job ID.`,
   hints: [
     "Use gl.message.sender_address to capture the caller.",
     "Increment job_count: self.job_count = self.job_count + u256(1).",

@@ -55,7 +55,7 @@ class TrustLance(gl.Contract):
         self.platform_description = "A GenLayer freelance escrow platform."
         self.job_count = u256(0)
 `,
-  task: `Add \`job_budgets: TreeMap[str, u256]\` as a class-level field. In \`create_job_stub\`, also accept a \`budget: u256\` parameter and store it in \`job_budgets[job_id]\`.`,
+  task: `Add \`job_budgets: TreeMap[str, u256]\` as a class-level field. Update \`create_job\` so it also accepts a \`budget: u256\` parameter and stores it in \`job_budgets[job_id]\`.`,
   hints: [
     "Declare job_budgets: TreeMap[str, u256] at class level.",
     "Store the budget using: self.job_budgets[job_id] = budget.",

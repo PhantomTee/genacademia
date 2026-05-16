@@ -60,7 +60,7 @@ class CodeVault(gl.Contract):
         self.platform_description = "A GenLayer private code marketplace."
         self.listing_count = u256(0)
 `,
-  task: `Add all 8 listing fields at class level. Update the stub to store title, description, source_hash, preview, and status ("active").`,
+  task: `Add all 8 listing fields at class level. Update \`create_listing\` to store title, description, source_hash, preview, and status ("active").`,
   hints: [
     "Declare all 8 fields at class level.",
     "Set listing_statuses[listing_id] = 'active'.",

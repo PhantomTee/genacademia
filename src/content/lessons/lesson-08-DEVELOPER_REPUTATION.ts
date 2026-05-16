@@ -55,7 +55,7 @@ class CodeVault(gl.Contract):
         self.platform_description = "A GenLayer private code marketplace."
         self.listing_count = u256(0)
 `,
-  task: `Add \`listing_prices: TreeMap[str, u256]\`. Update the stub to also accept \`price: u256\` and store it.`,
+  task: `Add \`listing_prices: TreeMap[str, u256]\`. Update \`create_listing\` so it also accepts \`price: u256\` and stores it in \`listing_prices[listing_id]\`.`,
   hints: [
     "Declare listing_prices: TreeMap[str, u256] at class level.",
     "Store price: self.listing_prices[listing_id] = price.",

@@ -60,7 +60,7 @@ def create_market(self, question: str, outcome_a: str, outcome_b: str) -> str:
     self.market_statuses[market_id] = "active"
     return market_id
 `,
-  task: `Add a method stub for creating markets:
+  task: `Add the first version of the market creation method:
 
 @gl.public.write
 def create_market(self, question: str, outcome_a: str, outcome_b: str) -> str:
@@ -71,7 +71,7 @@ Then store:
 
 self.market_creators[market_id] = gl.message.sender_address`,
   hints: [
-    "Add a method stub for creating markets:.",
+    "Add the first version of create_market.",
     "@gl.public.write",
     "Key line: `def create_market(self, question: str, outcome_a: str, outcome_b: str) -> str:`",
   ],

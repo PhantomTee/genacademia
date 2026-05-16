@@ -59,7 +59,7 @@ class TrustLance(gl.Contract):
         self.platform_description = "A GenLayer freelance escrow platform."
         self.job_count = u256(0)
 `,
-  task: `Add \`job_titles\`, \`job_descriptions\`, and \`job_statuses\` as \`TreeMap[str, str]\` fields. Update \`create_job_stub\` to store all three, setting status to \`"open"\`.`,
+  task: `Add \`job_titles\`, \`job_descriptions\`, and \`job_statuses\` as \`TreeMap[str, str]\` fields. Update \`create_job\` to store the title, description, and status, setting status to \`"open"\`.`,
   hints: [
     "Add three TreeMap[str, str] fields at class level.",
     "Set job_statuses[job_id] = 'open' in the creation method.",
