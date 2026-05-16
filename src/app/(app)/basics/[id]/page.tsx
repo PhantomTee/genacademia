@@ -2,12 +2,10 @@ import { notFound } from "next/navigation";
 import { getBasicsLesson, BASICS_LESSONS } from "@/content/basics/lessons";
 import { BasicsShell } from "@/components/basics/BasicsShell";
 
+export const dynamic = "force-dynamic";
+
 interface Props {
   params: { id: string };
-}
-
-export function generateStaticParams() {
-  return BASICS_LESSONS.map((l) => ({ id: String(l.id) }));
 }
 
 export default function BasicsLessonPage({ params }: Props) {

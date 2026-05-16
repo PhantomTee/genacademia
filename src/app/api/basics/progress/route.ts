@@ -19,5 +19,17 @@ export async function GET() {
     select: { lessonId: true },
   });
 
-  return NextResponse.json({ completed: progress.map((p) => p.lessonId) });
+  const res = NextResponse.json({ completed: progress.map((p) => p.lessonId) });
+
+  // Re-sync the ga-basics cookie so progress persists across sessions/cleared cookies
+  if (progress.some((p) => p.lessonId >= 3)) {
+    res.cookies.set("ga-basics", "1", {
+      httpOnly: true,
+      path: "/",
+      maxAge: 60 * 60 * 24 * 365,
+      sameSite: "lax",
+    });
+  }
+
+  return res;
 }

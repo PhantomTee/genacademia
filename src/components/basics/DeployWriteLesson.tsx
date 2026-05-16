@@ -17,6 +17,18 @@ interface Props {
   nextId: number | null;
 }
 
+function parseError(err: unknown, fallback: string): string {
+  const msg =
+    err instanceof Error
+      ? err.message
+      : (err as { message?: string })?.message;
+  if (!msg) return fallback;
+  if (msg === "Failed to fetch" || msg.toLowerCase().includes("failed to fetch")) {
+    return "Connection failed — make sure MetaMask is connected to GenLayer Studionet.";
+  }
+  return msg;
+}
+
 export function DeployWriteLesson({ lessonId, nextId }: Props) {
   const router = useRouter();
   const glClient = useGenLayerClient();
@@ -27,10 +39,11 @@ export function DeployWriteLesson({ lessonId, nextId }: Props) {
   const [returnedGreeting, setReturnedGreeting] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [completing, setCompleting] = useState(false);
+  const [taskDone, setTaskDone] = useState(false);
 
   async function handleDeploy() {
     if (!glClient) {
-      setErrorMsg("Connect your wallet first.");
+      setErrorMsg("Connect your wallet (top right) before deploying.");
       setStage("error");
       return;
     }
@@ -52,7 +65,7 @@ export function DeployWriteLesson({ lessonId, nextId }: Props) {
       setStage("deployed");
     } catch (err) {
       setStage("error");
-      setErrorMsg(err instanceof Error ? err.message : (err as { message?: string })?.message ?? "Deployment failed");
+      setErrorMsg(parseError(err, "Deployment failed."));
     }
   }
 
@@ -66,7 +79,7 @@ export function DeployWriteLesson({ lessonId, nextId }: Props) {
       return;
     }
     if (!glClient) {
-      setErrorMsg("Wallet not connected.");
+      setErrorMsg("Wallet not connected — use the button in the top right.");
       return;
     }
     setStage("writing");
@@ -85,7 +98,7 @@ export function DeployWriteLesson({ lessonId, nextId }: Props) {
       await handleRead();
     } catch (err) {
       setStage("error");
-      setErrorMsg(err instanceof Error ? err.message : (err as { message?: string })?.message ?? "Write call failed");
+      setErrorMsg(parseError(err, "Write call failed."));
     }
   }
 
@@ -102,13 +115,16 @@ export function DeployWriteLesson({ lessonId, nextId }: Props) {
       setStage("verified");
     } catch (err) {
       setStage("error");
-      setErrorMsg(err instanceof Error ? err.message : "Read call failed");
+      setErrorMsg(parseError(err, "Read call failed."));
     }
   }
 
   async function handleComplete() {
     setCompleting(true);
     await fetch(`/api/basics/${lessonId}/complete`, { method: "POST" });
+    setCompleting(false);
+    setTaskDone(true);
+    await new Promise((r) => setTimeout(r, 700));
     if (nextId) {
       router.push(`/basics/${nextId}`);
     } else {
@@ -124,6 +140,13 @@ export function DeployWriteLesson({ lessonId, nextId }: Props) {
           Step 1 — Deploy
         </div>
 
+        {/* Wallet gate */}
+        {!glClient && stage === "idle" && (
+          <p className="text-xs text-ink/50 dark:text-cream-200/50 border border-ink/10 dark:border-cream-200/10 px-3 py-2">
+            Connect your wallet using the button in the top right to deploy.
+          </p>
+        )}
+
         {(stage === "idle" || stage === "error") && (
           <>
             {stage === "error" && (
@@ -131,7 +154,8 @@ export function DeployWriteLesson({ lessonId, nextId }: Props) {
             )}
             <button
               onClick={handleDeploy}
-              className="w-full py-2.5 text-xs font-bold uppercase tracking-widest border border-ink dark:border-cream-200 bg-ink dark:bg-cream-200 text-cream-200 dark:text-ink hover:opacity-80 transition-opacity"
+              disabled={!glClient}
+              className="w-full py-2.5 text-xs font-bold uppercase tracking-widest border border-ink dark:border-cream-200 bg-ink dark:bg-cream-200 text-cream-200 dark:text-ink hover:opacity-80 disabled:opacity-30 transition-opacity"
             >
               Deploy Contract
             </button>
@@ -234,10 +258,14 @@ export function DeployWriteLesson({ lessonId, nextId }: Props) {
       {stage === "verified" && (
         <button
           onClick={handleComplete}
-          disabled={completing}
-          className="w-full py-3 text-sm font-bold uppercase tracking-widest border border-ink dark:border-cream-200 bg-ink dark:bg-cream-200 text-cream-200 dark:text-ink hover:opacity-80 disabled:opacity-30 transition-opacity"
+          disabled={completing || taskDone}
+          className={`w-full py-3 text-sm font-bold uppercase tracking-widest border transition-all ${
+            taskDone
+              ? "border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
+              : "border-ink dark:border-cream-200 bg-ink dark:bg-cream-200 text-cream-200 dark:text-ink hover:opacity-80 disabled:opacity-30"
+          }`}
         >
-          {completing ? "Loading..." : "Task complete — Next lesson →"}
+          {taskDone ? "✓ Complete" : completing ? "Saving..." : "Task complete — Next lesson →"}
         </button>
       )}
     </div>
