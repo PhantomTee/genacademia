@@ -26,8 +26,46 @@ export interface GenLayerReadClient {
   getTransaction: (args: { hash: `0x${string}` }) => Promise<GenLayerTransaction>;
 }
 
+const STUDIONET_CHAIN_ID = "0xF21F"; // 61999
+const STUDIONET_RPC =
+  process.env.NEXT_PUBLIC_STUDIONET_RPC ?? "https://studio.genlayer.com/api";
+
+type EthereumProvider = {
+  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+};
+
 export async function connectStudionet(_client: GenLayerWriteClient) {
-  // no-op: connect() is MetaMask Snap only, not needed for EIP-1193 provider clients
+  if (typeof window === "undefined") return;
+  const eth = (window as unknown as { ethereum?: EthereumProvider }).ethereum;
+  if (!eth) return;
+
+  try {
+    await eth.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: STUDIONET_CHAIN_ID }],
+    });
+  } catch (switchErr) {
+    const code = (switchErr as { code?: number })?.code;
+    if (code === 4902) {
+      // Chain not yet in MetaMask — add it
+      try {
+        await eth.request({
+          method: "wallet_addEthereumChain",
+          params: [
+            {
+              chainId: STUDIONET_CHAIN_ID,
+              chainName: "GenLayer Studionet",
+              nativeCurrency: { name: "GEN", symbol: "GEN", decimals: 18 },
+              rpcUrls: [STUDIONET_RPC],
+            },
+          ],
+        });
+      } catch {
+        // User rejected adding — proceed anyway
+      }
+    }
+    // code 4001 = user rejected switch — proceed anyway
+  }
 }
 
 export async function waitForFinalizedSuccess(

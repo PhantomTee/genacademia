@@ -65,7 +65,7 @@ export function DeployReadLesson({ lessonId, nextId }: Props) {
       setStage("deployed");
     } catch (err) {
       setStage("error");
-      setErrorMsg(err instanceof Error ? err.message : "Deployment failed");
+      setErrorMsg(err instanceof Error ? err.message : (err as { message?: string })?.message ?? "Deployment failed");
     }
   }
 
@@ -88,7 +88,7 @@ export function DeployReadLesson({ lessonId, nextId }: Props) {
       setStage("done");
     } catch (err) {
       setStage("error");
-      setErrorMsg(err instanceof Error ? err.message : "Call failed");
+      setErrorMsg(err instanceof Error ? err.message : (err as { message?: string })?.message ?? "Call failed");
     }
   }
 

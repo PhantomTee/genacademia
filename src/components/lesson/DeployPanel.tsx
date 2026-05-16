@@ -73,7 +73,7 @@ export function DeployPanel({ lessonId, code, onDeployed }: Props) {
       onDeployed(address);
     } catch (err) {
       setState("error");
-      setError(err instanceof Error ? err.message : "Deployment failed");
+      setError(err instanceof Error ? err.message : (err as { message?: string })?.message ?? "Deployment failed");
     }
   }
 
