@@ -26,7 +26,12 @@ export default async function LessonPage({
 
   const projectPath = session!.user.projectPath as ProjectPath;
 
-  const content = await getContent(lessonId, projectPath);
+  const [content, prevContent] = await Promise.all([
+    getContent(lessonId, projectPath),
+    lessonId > 1 ? getContent(lessonId - 1, projectPath).catch(() => null) : Promise.resolve(null),
+  ]);
 
-  return <LessonShell lesson={lesson} content={content} />;
+  const prevCode = prevContent?.expectedCode ?? prevContent?.starterCode;
+
+  return <LessonShell lesson={lesson} content={content} prevCode={prevCode} />;
 }

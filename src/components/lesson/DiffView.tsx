@@ -42,10 +42,12 @@ function computeLineDiff(before: string, after: string): DiffLine[] {
 interface Props {
   starterCode: string;
   expectedCode: string;
+  title?: string;
+  defaultOpen?: boolean;
 }
 
-export function DiffView({ starterCode, expectedCode }: Props) {
-  const [open, setOpen] = useState(false);
+export function DiffView({ starterCode, expectedCode, title = "Solution diff", defaultOpen = false }: Props) {
+  const [open, setOpen] = useState(defaultOpen);
 
   const diff = useMemo(
     () => computeLineDiff(starterCode.trimEnd(), expectedCode.trimEnd()),
@@ -61,7 +63,7 @@ export function DiffView({ starterCode, expectedCode }: Props) {
         onClick={() => setOpen((o) => !o)}
         className="w-full flex items-center justify-between px-3 py-2 text-xs font-mono text-ink/60 dark:text-cream-200/60 hover:text-ink dark:hover:text-cream-200 transition-colors bg-ink/3 dark:bg-cream-200/3"
       >
-        <span className="uppercase tracking-widest font-bold">Solution diff</span>
+        <span className="uppercase tracking-widest font-bold">{title}</span>
         <span className="flex gap-2">
           {addCount > 0 && <span className="text-emerald-500">+{addCount}</span>}
           {removeCount > 0 && <span className="text-red-400">−{removeCount}</span>}

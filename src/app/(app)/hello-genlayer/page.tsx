@@ -64,13 +64,19 @@ export default function HelloGenLayerPage() {
     try {
       const client = glClient as unknown as {
         deployContract: (o: { code: string; args: unknown[] }) => Promise<string>;
-        waitForTransactionReceipt: (o: { hash: string }) => Promise<Record<string, string>>;
+        waitForTransactionReceipt: (o: { hash: string }) => Promise<unknown>;
       };
       const hash = await client.deployContract({ code: HELLO_CONTRACT, args: [] });
-      const receipt = await client.waitForTransactionReceipt({ hash });
-      const addr = (receipt as unknown as { txDataDecoded?: { contractAddress?: string } })
-        ?.txDataDecoded?.contractAddress ?? "";
-      setContractAddress(addr);
+      await client.waitForTransactionReceipt({ hash });
+
+      // Fetch address from Studio API now that the tx is finalized
+      const addrRes = await fetch("/api/deploy/address", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ txHash: hash }),
+      });
+      const addrData = await addrRes.json() as { contractAddress?: string };
+      setContractAddress(addrData.contractAddress ?? "");
       setDeployState("success");
     } catch (err) {
       setDeployState("error");
@@ -79,7 +85,11 @@ export default function HelloGenLayerPage() {
   }
 
   async function handleCall() {
-    if (!contractAddress) return;
+    if (!contractAddress) {
+      setCallError("No contract address — paste it above.");
+      setCallState("error");
+      return;
+    }
     setCallState("calling");
     setCallError("");
     try {
@@ -329,9 +339,25 @@ export default function HelloGenLayerPage() {
                 <div className="text-[10px] font-bold uppercase tracking-widest text-green-500">
                   ✓ Deployed
                 </div>
-                <div className="text-xs text-ink/50 dark:text-cream-200/50 break-all font-mono leading-relaxed">
-                  {contractAddress}
-                </div>
+                {contractAddress ? (
+                  <div className="text-xs text-ink/50 dark:text-cream-200/50 break-all font-mono leading-relaxed">
+                    {contractAddress}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-xs text-ink/50 dark:text-cream-200/50">
+                      Paste your contract address from the{" "}
+                      <strong className="text-ink dark:text-cream-200">GenLayer Studio explorer</strong>:
+                    </p>
+                    <input
+                      type="text"
+                      placeholder="0x..."
+                      value={contractAddress}
+                      onChange={(e) => setContractAddress(e.target.value.trim())}
+                      className="w-full text-xs font-mono px-3 py-2 border border-ink/30 dark:border-cream-200/30 bg-transparent text-ink dark:text-cream-200 placeholder-ink/20 dark:placeholder-cream-200/20 focus:outline-none focus:border-ink dark:focus:border-cream-200"
+                    />
+                  </div>
+                )}
               </div>
               <p className="text-sm text-ink/70 dark:text-cream-200/70">
                 Your contract is live on Studionet. Now let&apos;s call it.

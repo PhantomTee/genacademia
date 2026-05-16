@@ -43,12 +43,20 @@ export function DeployPanel({ lessonId, code, onDeployed }: Props) {
       setState("polling");
       setStatusLabel(STATUS_LABELS.PENDING);
 
-      const receipt = await (glClient as unknown as {
-        waitForTransactionReceipt: (o: { hash: string }) => Promise<{ txDataDecoded?: { contractAddress?: string } }>;
+      await (glClient as unknown as {
+        waitForTransactionReceipt: (o: { hash: string }) => Promise<unknown>;
       }).waitForTransactionReceipt({ hash });
-      const address = receipt?.txDataDecoded?.contractAddress ?? "";
-      setContractAddress(address);
       setStatusLabel(STATUS_LABELS.FINALIZED);
+
+      // Fetch deployed address from Studio API now that the tx is finalized
+      const addrRes = await fetch("/api/deploy/address", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ txHash: hash }),
+      });
+      const addrData = await addrRes.json() as { contractAddress?: string };
+      const address = addrData.contractAddress ?? "";
+      setContractAddress(address);
       setState("success");
 
       await fetch(`/api/lesson/${lessonId}/contract`, {
@@ -108,9 +116,16 @@ export function DeployPanel({ lessonId, code, onDeployed }: Props) {
           <div className="text-xs font-bold uppercase tracking-widest text-ink dark:text-cream-200">
             ✓ Deployed
           </div>
-          <div className="text-[10px] text-ink/50 dark:text-cream-200/50 break-all leading-relaxed">
-            {contractAddress}
-          </div>
+          {contractAddress ? (
+            <div className="text-[10px] text-ink/50 dark:text-cream-200/50 break-all leading-relaxed">
+              {contractAddress}
+            </div>
+          ) : (
+            <p className="text-[10px] text-ink/50 dark:text-cream-200/50 leading-relaxed">
+              Paste your contract address in the{" "}
+              <span className="text-ink dark:text-cream-200">Verify</span> tab.
+            </p>
+          )}
           <button
             onClick={handleDeploy}
             className="text-[10px] uppercase tracking-widest text-ink/40 dark:text-cream-200/40 hover:text-ink dark:hover:text-cream-200 transition-colors"

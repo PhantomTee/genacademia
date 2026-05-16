@@ -12,6 +12,7 @@ interface Props {
   docUrl: string;
   starterCode?: string;
   expectedCode?: string;
+  prevCode?: string;
 }
 
 const mdComponents: Components = {
@@ -80,12 +81,21 @@ const mdComponents: Components = {
   ),
 };
 
-export function ContentRenderer({ explanation, task, docUrl, starterCode, expectedCode }: Props) {
+export function ContentRenderer({ explanation, task, docUrl, starterCode, expectedCode, prevCode }: Props) {
   return (
     <div className="h-full overflow-y-auto p-6 space-y-6">
       <ReactMarkdown rehypePlugins={[rehypeHighlight]} components={mdComponents}>
         {explanation}
       </ReactMarkdown>
+
+      {prevCode && starterCode && prevCode !== starterCode && (
+        <DiffView
+          starterCode={prevCode}
+          expectedCode={starterCode}
+          title="What changed since last lesson"
+          defaultOpen={true}
+        />
+      )}
 
       <div className="border border-ink/20 dark:border-cream-200/20 p-4">
         <div className="text-[10px] font-bold uppercase tracking-widest text-ink/40 dark:text-cream-200/40 mb-2">

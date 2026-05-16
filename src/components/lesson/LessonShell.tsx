@@ -20,9 +20,10 @@ type Tab = "deploy" | "verify" | "hints" | "cheatsheet";
 interface Props {
   lesson: LessonMeta;
   content: LessonContent;
+  prevCode?: string;
 }
 
-export function LessonShell({ lesson, content }: Props) {
+export function LessonShell({ lesson, content, prevCode }: Props) {
   useSession();
   const storageKey = `draft-${lesson.id}-${content.projectPath}`;
   const [code, setCode] = useState(() => {
@@ -91,6 +92,7 @@ export function LessonShell({ lesson, content }: Props) {
               docUrl={lesson.docUrl}
               starterCode={content.starterCode}
               expectedCode={content.expectedCode}
+              prevCode={prevCode}
             />
           </Panel>
 
@@ -186,6 +188,8 @@ export function LessonShell({ lesson, content }: Props) {
           explanation={content.explanation}
           task={content.task}
           docUrl={lesson.docUrl}
+          starterCode={content.starterCode}
+          prevCode={prevCode}
         />
         <div className="h-80 border-y border-ink/15 dark:border-cream-200/15">
           {progressLoaded && (
