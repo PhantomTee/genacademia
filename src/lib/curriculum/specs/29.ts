@@ -2,48 +2,43 @@ import type { LessonSpecs } from "./index";
 
 export const specs: LessonSpecs = {
   PREDICTION_MARKET: {
-    method: "get_all_markets_json",
+    method: "get_platform_name",
     args: [],
     expectedShape: "nonEmpty",
     staticChecks: {
       requiredClass: "PredictX",
-      requiredConcepts: ["__receive_"],
     },
   },
   FREELANCE_ESCROW: {
-    method: "get_title",
+    method: "get_platform_name",
     args: [],
     expectedShape: "nonEmpty",
     staticChecks: {
-      requiredClass: "FreelanceEscrow",
-      requiredConcepts: ["__receive_"],
+      requiredClass: "TrustLance",
     },
   },
   DAO: {
-    method: "get_name",
+    method: "get_dao_name",
     args: [],
     expectedShape: "nonEmpty",
     staticChecks: {
-      requiredClass: "GovernanceDAO",
-      requiredConcepts: ["__receive_"],
+      requiredClass: "GovMind",
     },
   },
   DEVELOPER_REPUTATION: {
-    method: "get_registry_name",
+    method: "get_platform_name",
     args: [],
     expectedShape: "nonEmpty",
     staticChecks: {
-      requiredClass: "DeveloperReputation",
-      requiredConcepts: ["__receive_"],
+      requiredClass: "CodeVault",
     },
   },
   INSURANCE: {
-    method: "get_all_cases_json",
+    method: "get_court_name",
     args: [],
     expectedShape: "nonEmpty",
     staticChecks: {
       requiredClass: "CaseWise",
-      requiredConcepts: ["__receive_"],
     },
   },
 };

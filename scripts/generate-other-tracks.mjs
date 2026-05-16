@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env node
+#!/usr/bin/env node
 // scripts/generate-other-tracks.mjs
 // Generates 30 lesson files each for FREELANCE_ESCROW, DAO, and DEVELOPER_REPUTATION
 // following the same 30-lesson group structure from the gist.
@@ -12,7 +12,7 @@ const ROOT = resolve(__dirname, "..");
 const LESSONS_DIR = resolve(ROOT, "src", "content", "lessons");
 const HASH = `py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6`;
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// -- Helpers -------------------------------------------------------------------
 function normalizeQ(s) {
   let r = "";
   for (let i = 0; i < s.length; i++) {
@@ -62,14 +62,14 @@ function write(lessonId, projectPath, explanation, starterCode, task, h1, h2, h3
   const nn = String(lessonId).padStart(2, "0");
   const fp = resolve(LESSONS_DIR, `lesson-${nn}-${projectPath}.ts`);
   writeFileSync(fp, file(lessonId, projectPath, explanation, starterCode, task, h1, h2, h3, expectedCode), "utf8");
-  console.log(`  ✓ lesson-${nn}-${projectPath}.ts`);
+  console.log(`  ? lesson-${nn}-${projectPath}.ts`);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 //  FREELANCE_ESCROW  (TrustLance)
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
-console.log("\n── Generating FREELANCE_ESCROW ──────────────────");
+console.log("\n-- Generating FREELANCE_ESCROW ------------------");
 
 const FE = "FREELANCE_ESCROW";
 const feBase = `# { "Depends": "${HASH}" }
@@ -77,6 +77,14 @@ const feBase = `# { "Depends": "${HASH}" }
 import json
 from genlayer import *
 
+
+@gl.evm.contract_interface
+class _Recipient:
+    class View:
+        pass
+
+    class Write:
+        pass
 
 class TrustLance(gl.Contract):
     owner: Address
@@ -219,7 +227,7 @@ const feL20 = feL15 + `
         assert not self.freelancer_claimed.get(job_id, False), "Already paid"
         self.freelancer_claimed[job_id] = True
         self.job_statuses[job_id] = "completed"
-        gl.message.recipient_address.transfer(self.job_escrow[job_id])`;
+        _Recipient(self.job_freelancers[job_id]).emit_transfer(value=self.job_escrow[job_id])`;
 
 const feL25 = feL20 + `
 
@@ -237,12 +245,17 @@ const feL25 = feL20 + `
             f"Respond with JSON: {{\\\"verdict\\\": \\\"release\\\" or \\\"refund\\\", "
             f"\\\"confidence\\\": 0-100, \\\"reason\\\": \\\"explanation\\\"}}"
         )
-        def run(prompt):
-            result = gl.nondet.exec_prompt(prompt)
-            import re
-            m = re.search(r'\\{.*\\}', result, re.DOTALL)
-            return m.group(0) if m else result
-        result = gl.eq_principle_strict_eq(run, prompt)
+        def run():
+            return gl.nondet.exec_prompt(prompt, response_format="json")
+
+        def validate_result(leader_result) -> bool:
+            if not isinstance(leader_result, gl.vm.Return):
+                return False
+            data = leader_result.calldata
+            return isinstance(data, dict) and len(data) > 0
+
+        result = gl.vm.run_nondet_unsafe(run, validate_result)
+        result = json.dumps(result, sort_keys=True)
         return result`;
 
 const feFinal = feL25 + `
@@ -611,7 +624,7 @@ feL15.split("    @gl.public.view\n    def get_open_jobs_json")[0] + `
 write(14, FE, `## Lesson 14 — Job Status Flow
 
 ### What You'll Learn
-Model the job lifecycle: \`open → funded → accepted → delivered → completed/closed\`. Add a \`close_job()\` method.`,
+Model the job lifecycle: \`open ? funded ? accepted ? delivered ? completed/closed\`. Add a \`close_job()\` method.`,
 feL15.split("    @gl.public.view\n    def get_all_jobs_json")[0] + `
     @gl.public.view
     def get_open_jobs_json(self) -> str:
@@ -690,15 +703,15 @@ write(19, FE, `## Lesson 19 — Release and Refund Patterns
 Add \`confirm_delivery()\` to release escrowed funds to the freelancer, and ensure duplicate payments are blocked.`,
 feL20 + `
 `,
-`Add the \`confirm_delivery(self, job_id: str)\` method that: checks caller is client, status is "delivered", not already claimed; marks claimed, sets status "completed", and calls \`gl.message.recipient_address.transfer(self.job_escrow[job_id])\`.`,
+`Add the \`confirm_delivery(self, job_id: str)\` method that: checks caller is client, status is "delivered", not already claimed; marks claimed, sets status "completed", and calls \`_Recipient(self.job_freelancers[job_id]).emit_transfer(value=self.job_escrow[job_id])\`.`,
 "Check freelancer_claimed[job_id] is False before paying.",
 "Set freelancer_claimed[job_id] = True before transferring.",
-"Key line: `gl.message.recipient_address.transfer(self.job_escrow[job_id])`");
+"Key line: `_Recipient(self.job_freelancers[job_id]).emit_transfer(value=self.job_escrow[job_id])`");
 
 write(20, FE, `## Lesson 20 — Major Upgrade: Complete Freelance Escrow Flow
 
 ### What You'll Learn
-Ship the complete fund → accept → deliver → confirm/refund TrustLance escrow system.`,
+Ship the complete fund ? accept ? deliver ? confirm/refund TrustLance escrow system.`,
 feL20 + `
 `,
 `The contract is mostly complete. Add a simple \`get_escrow_balance(self, job_id: str) -> str\` view method that returns the locked escrow as a string.`,
@@ -724,13 +737,13 @@ feL20 + `
 write(22, FE, `## Lesson 22 — Dispute Review with gl.nondet.exec_prompt
 
 ### What You'll Learn
-Call \`gl.nondet.exec_prompt()\` to send the dispute to the AI and get a verdict. Wrap the call in \`gl.eq_principle_strict_eq\` for validator consensus.`,
+Call \`gl.nondet.exec_prompt()\` to send the dispute to the AI and get a verdict. Wrap the call in \`gl.vm.run_nondet_unsafe\` for validator consensus.`,
 feL20 + `
 `,
-`Add \`review_dispute_with_ai(self, job_id: str, reason: str) -> str\`. Build a prompt, define an inner function that calls \`gl.nondet.exec_prompt(prompt)\`, then call \`gl.eq_principle_strict_eq(run, prompt)\`.`,
-"Define a nested def run(prompt): inside the method.",
-"Call gl.eq_principle_strict_eq(run, prompt) — not exec_prompt directly.",
-"Key line: `result = gl.eq_principle_strict_eq(run, prompt)`");
+`Add \`review_dispute_with_ai(self, job_id: str, reason: str) -> str\`. Build a prompt, define an inner function that calls \`gl.nondet.exec_prompt(prompt)\`, then call \`gl.vm.run_nondet_unsafe(run, validate_result)\`.`,
+"Define a nested def run(): inside the method.",
+"Call gl.vm.run_nondet_unsafe(run, validate_result) — not exec_prompt directly.",
+"Key line: `result = gl.vm.run_nondet_unsafe(run, validate_result)`");
 
 write(23, FE, `## Lesson 23 — Comparative AI Validation
 
@@ -821,11 +834,11 @@ feFinal + `
 "Make sure the dependency header uses the real hash (not :test).",
 "Deploy on Studionet and call get_platform_name() to verify.");
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 //  DAO  (GovMind)
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
-console.log("\n── Generating DAO ──────────────────");
+console.log("\n-- Generating DAO ------------------");
 
 const DA = "DAO";
 const daoBase = `# { "Depends": "${HASH}" }
@@ -984,12 +997,17 @@ const daoL25 = daoL20 + `
             f"Respond with JSON: {{\\\"summary\\\": \\\"one sentence\\\", "
             f"\\\"risk_score\\\": 0-100, \\\"recommendation\\\": \\\"approve\\\" or \\\"reject\\\"}}"
         )
-        def run(prompt):
-            result = gl.nondet.exec_prompt(prompt)
-            import re
-            m = re.search(r'\\{.*\\}', result, re.DOTALL)
-            return m.group(0) if m else result
-        result = gl.eq_principle_strict_eq(run, prompt)
+        def run():
+            return gl.nondet.exec_prompt(prompt, response_format="json")
+
+        def validate_result(leader_result) -> bool:
+            if not isinstance(leader_result, gl.vm.Return):
+                return False
+            data = leader_result.calldata
+            return isinstance(data, dict) and len(data) > 0
+
+        result = gl.vm.run_nondet_unsafe(run, validate_result)
+        result = json.dumps(result, sort_keys=True)
         self.proposal_ai_summaries[proposal_id] = result
         return result`;
 
@@ -1293,7 +1311,7 @@ daoL15.split("    @gl.public.view\n    def get_all_proposals_json")[0] + `
 write(14, DA, `## Lesson 14 — Proposal Status Flow
 
 ### What You'll Learn
-Model proposal states: open → passed/rejected/closed. Add \`close_proposal()\` for the owner.`,
+Model proposal states: open ? passed/rejected/closed. Add \`close_proposal()\` for the owner.`,
 daoL15.split("    @gl.public.write\n    def close_proposal")[0] + `
 `,
 `Add \`close_proposal(self, proposal_id: str)\` with \`@gl.public.write\`. Owner only, proposal must be "open".`,
@@ -1363,7 +1381,7 @@ daoL20 + `
 write(20, DA, `## Lesson 20 — Major Upgrade: Full Governance Voting Flow
 
 ### What You'll Learn
-Ship the complete propose → vote → execute GovMind governance system.`,
+Ship the complete propose ? vote ? execute GovMind governance system.`,
 daoL20 + `
 `,
 `Add \`get_member_count(self) -> str\` as a \`@gl.public.view\`. Since TreeMap doesn't have .len(), keep a \`member_count: u256\` counter and increment it in \`add_member()\`.`,
@@ -1385,13 +1403,13 @@ daoL20 + `
 write(22, DA, `## Lesson 22 — Using gl.nondet.exec_prompt for Proposals
 
 ### What You'll Learn
-Call \`gl.nondet.exec_prompt()\` wrapped in \`gl.eq_principle_strict_eq\` to analyze a proposal with AI.`,
+Call \`gl.nondet.exec_prompt()\` wrapped in \`gl.vm.run_nondet_unsafe\` to analyze a proposal with AI.`,
 daoL20 + `
 `,
-`Add \`analyze_proposal_with_ai(self, proposal_id: str) -> str\`. Build the prompt, define an inner \`run(prompt)\` calling \`gl.nondet.exec_prompt(prompt)\`, call \`gl.eq_principle_strict_eq(run, prompt)\`.`,
-"Define def run(prompt): inside the method.",
-"Call gl.eq_principle_strict_eq(run, prompt) — not exec_prompt directly.",
-"Key line: `return gl.eq_principle_strict_eq(run, prompt)`");
+`Add \`analyze_proposal_with_ai(self, proposal_id: str) -> str\`. Build the prompt, define an inner \`run(prompt)\` calling \`gl.nondet.exec_prompt(prompt)\`, call \`gl.vm.run_nondet_unsafe(run, validate_result)\`.`,
+"Define def run(): inside the method.",
+"Call gl.vm.run_nondet_unsafe(run, validate_result) — not exec_prompt directly.",
+"Key line: `return gl.vm.run_nondet_unsafe(run, validate_result)`");
 
 write(23, DA, `## Lesson 23 — Comparative Validation for AI Governance
 
@@ -1481,17 +1499,26 @@ daoFinal + `
 "Make sure the dependency header uses the real hash.",
 "Call get_dao_name() after deployment to verify.");
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 //  DEVELOPER_REPUTATION  (CodeVault)
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
-console.log("\n── Generating DEVELOPER_REPUTATION ──────────────────");
+console.log("\n-- Generating DEVELOPER_REPUTATION ------------------");
 
 const DR = "DEVELOPER_REPUTATION";
 const cvBase = `# { "Depends": "${HASH}" }
 
 import json
 from genlayer import *
+
+
+@gl.evm.contract_interface
+class _Recipient:
+    class View:
+        pass
+
+    class Write:
+        pass
 
 
 class CodeVault(gl.Contract):
@@ -1630,7 +1657,7 @@ const cvL20 = cvL15 + `
         self.purchase_statuses[listing_id] = "completed"
         self.listing_statuses[listing_id] = "sold"
         seller = self.listing_sellers[listing_id]
-        seller.transfer(self.purchase_escrow[listing_id])
+        _Recipient(seller).emit_transfer(value=self.purchase_escrow[listing_id])
 
     @gl.public.view
     def get_source_hash(self, listing_id: str) -> str:
@@ -1655,12 +1682,17 @@ const cvL25 = cvL20 + `
             f"Respond with JSON: {{\\\"verdict\\\": \\\"approve\\\" or \\\"reject\\\", "
             f"\\\"quality_score\\\": 0-100, \\\"explanation\\\": \\\"reason\\\"}}"
         )
-        def run(prompt):
-            result = gl.nondet.exec_prompt(prompt)
-            import re
-            m = re.search(r'\\{.*\\}', result, re.DOTALL)
-            return m.group(0) if m else result
-        result = gl.eq_principle_strict_eq(run, prompt)
+        def run():
+            return gl.nondet.exec_prompt(prompt, response_format="json")
+
+        def validate_result(leader_result) -> bool:
+            if not isinstance(leader_result, gl.vm.Return):
+                return False
+            data = leader_result.calldata
+            return isinstance(data, dict) and len(data) > 0
+
+        result = gl.vm.run_nondet_unsafe(run, validate_result)
+        result = json.dumps(result, sort_keys=True)
         self.listing_ai_verdicts[listing_id] = result
         return result`;
 
@@ -1958,7 +1990,7 @@ cvL15.split("    @gl.public.view\n    def get_all_listings_json")[0] + `
 write(14, DR, `## Lesson 14 — Listing Status Flow
 
 ### What You'll Learn
-Model listing states: active → pending → sold/removed. Add \`remove_listing()\`.`,
+Model listing states: active ? pending ? sold/removed. Add \`remove_listing()\`.`,
 cvL15.split("    @gl.public.write\n    def remove_listing")[0] + `
 `,
 `Add \`remove_listing(self, listing_id: str)\` — seller or owner can remove, only if "active". Set status to "removed".`,
@@ -2001,7 +2033,7 @@ cvL20.split("    @gl.public.write\n    def confirm_purchase")[0] + `
 `Add \`confirm_purchase(self, listing_id: str)\` that only the original buyer can call, marks seller as claimed, pays the seller, and sets statuses to completed/sold.`,
 "Assert sender == purchase_buyers[listing_id].",
 "Check seller_claimed[listing_id] is False before paying.",
-"Key line: `seller.transfer(self.purchase_escrow[listing_id])`");
+"Key line: `_Recipient(seller).emit_transfer(value=self.purchase_escrow[listing_id])`");
 
 write(18, DR, `## Lesson 18 — Escrow Storage
 
@@ -2023,12 +2055,12 @@ cvL20 + `
 `Add \`refund_purchase(self, listing_id: str)\` — buyer only, purchase must be pending, not already claimed. Transfer escrow back to sender and set status to "refunded".`,
 "Check sender == purchase_buyers[listing_id].",
 "Check purchase_statuses == pending.",
-"Key line: `gl.message.sender_address.transfer(self.purchase_escrow[listing_id])`");
+"Key line: `_Recipient(gl.message.sender_address).emit_transfer(value=self.purchase_escrow[listing_id])`");
 
 write(20, DR, `## Lesson 20 — Major Upgrade: Full Code Purchase Escrow
 
 ### What You'll Learn
-Ship the complete buy → confirm/refund CodeVault escrow system. Source is only revealed after confirmed purchase.`,
+Ship the complete buy ? confirm/refund CodeVault escrow system. Source is only revealed after confirmed purchase.`,
 cvL20 + `
 `,
 `Add \`get_source_hash(self, listing_id: str) -> str\` as a \`@gl.public.view\`. Assert purchase is "completed" before returning the hash.`,
@@ -2050,13 +2082,13 @@ cvL20 + `
 write(22, DR, `## Lesson 22 — Using gl.nondet.exec_prompt for Code Review
 
 ### What You'll Learn
-Call \`gl.nondet.exec_prompt()\` wrapped in \`gl.eq_principle_strict_eq\` to evaluate a listing.`,
+Call \`gl.nondet.exec_prompt()\` wrapped in \`gl.vm.run_nondet_unsafe\` to evaluate a listing.`,
 cvL20 + `
 `,
-`Add \`evaluate_listing_with_ai(self, listing_id: str) -> str\`. Build the prompt, define inner \`run(prompt)\`, call \`gl.eq_principle_strict_eq(run, prompt)\`.`,
-"Define a nested def run(prompt): inside the method.",
-"Call gl.eq_principle_strict_eq(run, prompt).",
-"Key line: `return gl.eq_principle_strict_eq(run, prompt)`");
+`Add \`evaluate_listing_with_ai(self, listing_id: str) -> str\`. Build the prompt, define inner \`run(prompt)\`, call \`gl.vm.run_nondet_unsafe(run, validate_result)\`.`,
+"Define a nested def run(): inside the method.",
+"Call gl.vm.run_nondet_unsafe(run, validate_result).",
+"Key line: `return gl.vm.run_nondet_unsafe(run, validate_result)`");
 
 write(23, DR, `## Lesson 23 — Comparative AI Validation
 
@@ -2146,4 +2178,4 @@ cvFinal + `
 "Make sure the dependency header uses the real hash.",
 "Call get_platform_name() after deployment to verify.");
 
-console.log("\n✅ All 90 files generated (FREELANCE_ESCROW, DAO, DEVELOPER_REPUTATION).");
+console.log("\n? All 90 files generated (FREELANCE_ESCROW, DAO, DEVELOPER_REPUTATION).");

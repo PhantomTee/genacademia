@@ -13,6 +13,15 @@ import json
 from genlayer import *
 
 
+@gl.evm.contract_interface
+class _Recipient:
+    class View:
+        pass
+
+    class Write:
+        pass
+
+
 class CodeVault(gl.Contract):
     owner: Address
     platform_name: str
@@ -141,7 +150,7 @@ class CodeVault(gl.Contract):
         self.purchase_statuses[listing_id] = "completed"
         self.listing_statuses[listing_id] = "sold"
         seller = self.listing_sellers[listing_id]
-        seller.transfer(self.purchase_escrow[listing_id])
+        _Recipient(seller).emit_transfer(value=self.purchase_escrow[listing_id])
 
     @gl.public.view
     def get_source_hash(self, listing_id: str) -> str:

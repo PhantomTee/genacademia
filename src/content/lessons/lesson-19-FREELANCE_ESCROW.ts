@@ -13,6 +13,14 @@ import json
 from genlayer import *
 
 
+@gl.evm.contract_interface
+class _Recipient:
+    class View:
+        pass
+
+    class Write:
+        pass
+
 class TrustLance(gl.Contract):
     owner: Address
     platform_name: str
@@ -146,13 +154,13 @@ class TrustLance(gl.Contract):
         assert not self.freelancer_claimed.get(job_id, False), "Already paid"
         self.freelancer_claimed[job_id] = True
         self.job_statuses[job_id] = "completed"
-        gl.message.recipient_address.transfer(self.job_escrow[job_id])
+        _Recipient(self.job_freelancers[job_id]).emit_transfer(value=self.job_escrow[job_id])
 `,
-  task: `Add the \`confirm_delivery(self, job_id: str)\` method that: checks caller is client, status is "delivered", not already claimed; marks claimed, sets status "completed", and calls \`gl.message.recipient_address.transfer(self.job_escrow[job_id])\`.`,
+  task: `Add the \`confirm_delivery(self, job_id: str)\` method that: checks caller is client, status is "delivered", not already claimed; marks claimed, sets status "completed", and calls \`_Recipient(self.job_freelancers[job_id]).emit_transfer(value=self.job_escrow[job_id])\`.`,
   hints: [
     "Check freelancer_claimed[job_id] is False before paying.",
     "Set freelancer_claimed[job_id] = True before transferring.",
-    "Key line: `gl.message.recipient_address.transfer(self.job_escrow[job_id])`",
+    "Key line: `_Recipient(self.job_freelancers[job_id]).emit_transfer(value=self.job_escrow[job_id])`",
   ],
 };
 

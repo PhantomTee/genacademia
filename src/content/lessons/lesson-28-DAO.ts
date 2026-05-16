@@ -153,12 +153,17 @@ class GovMind(gl.Contract):
             f"Respond with JSON: {{\\"summary\\": \\"one sentence\\", "
             f"\\"risk_score\\": 0-100, \\"recommendation\\": \\"approve\\" or \\"reject\\"}}"
         )
-        def run(prompt):
-            result = gl.nondet.exec_prompt(prompt)
-            import re
-            m = re.search(r'\\{.*\\}', result, re.DOTALL)
-            return m.group(0) if m else result
-        result = gl.eq_principle_strict_eq(run, prompt)
+        def run():
+            return gl.nondet.exec_prompt(prompt, response_format="json")
+
+        def validate_result(leader_result) -> bool:
+            if not isinstance(leader_result, gl.vm.Return):
+                return False
+            data = leader_result.calldata
+            return isinstance(data, dict) and len(data) > 0
+
+        result = gl.vm.run_nondet_unsafe(run, validate_result)
+        result = json.dumps(result, sort_keys=True)
         self.proposal_ai_summaries[proposal_id] = result
         return result
 

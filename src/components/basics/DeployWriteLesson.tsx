@@ -4,6 +4,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useGenLayerClient } from "@/lib/wagmi/useGenLayerClient";
 import { WRITE_CONTRACT } from "@/content/basics/lessons";
+import {
+  connectStudionet,
+  type GenLayerWriteClient,
+  waitForFinalizedSuccess,
+} from "@/lib/genlayer/transactions";
 
 type Stage = "idle" | "deploying" | "deployed" | "writing" | "reading" | "verified" | "error";
 
@@ -32,12 +37,10 @@ export function DeployWriteLesson({ lessonId, nextId }: Props) {
     setStage("deploying");
     setErrorMsg("");
     try {
-      const client = glClient as unknown as {
-        deployContract: (o: { code: string; args: unknown[] }) => Promise<string>;
-        waitForTransactionReceipt: (o: { hash: string }) => Promise<unknown>;
-      };
+      const client = glClient as unknown as GenLayerWriteClient;
+      await connectStudionet(client);
       const hash = await client.deployContract({ code: WRITE_CONTRACT, args: [] });
-      await client.waitForTransactionReceipt({ hash });
+      await waitForFinalizedSuccess(client, hash);
 
       const addrRes = await fetch("/api/deploy/address", {
         method: "POST",
@@ -69,20 +72,15 @@ export function DeployWriteLesson({ lessonId, nextId }: Props) {
     setStage("writing");
     setErrorMsg("");
     try {
-      const client = glClient as unknown as {
-        callContractFunction: (o: {
-          contractAddress: string;
-          functionName: string;
-          args: unknown[];
-        }) => Promise<string>;
-        waitForTransactionReceipt: (o: { hash: string }) => Promise<unknown>;
-      };
-      const hash = await client.callContractFunction({
-        contractAddress,
+      const client = glClient as unknown as GenLayerWriteClient;
+      await connectStudionet(client);
+      const hash = await client.writeContract({
+        address: contractAddress as `0x${string}`,
         functionName: "set_greeting",
         args: [newGreeting.trim()],
+        value: BigInt(0),
       });
-      await client.waitForTransactionReceipt({ hash });
+      await waitForFinalizedSuccess(client, hash);
       setStage("reading");
       await handleRead();
     } catch (err) {

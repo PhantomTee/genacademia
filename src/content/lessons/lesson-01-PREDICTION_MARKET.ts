@@ -16,7 +16,7 @@ They do not write a full contract yet. They inspect the final direction and comp
 The contract begins with the dependency header:
 
 \`\`\`python
-# { "Depends": "py-genlayer:test" }
+# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 \`\`\`
 
 Then it imports GenLayer:

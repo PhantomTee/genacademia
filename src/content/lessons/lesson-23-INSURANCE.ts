@@ -88,7 +88,7 @@ class CaseWise(gl.Contract):
 
 parts = result.split("|")
 Expected code pattern
-result = gl.nondet.exec_prompt(prompt)
+result = gl.vm.run_nondet_unsafe(run, validate_result)
 parts = result.split("|")
 
 assert len(parts) == 3, "AI result must contain ruling, confidence, and reason"

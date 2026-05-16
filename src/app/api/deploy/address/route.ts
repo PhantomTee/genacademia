@@ -1,19 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { getGenLayerClient } from "@/lib/genlayer/client";
+import { NETWORK_CONFIG } from "@/lib/genlayer/constants";
+import {
+  getRecipientAddress,
+  type GenLayerReadClient,
+  ZERO_ADDRESS,
+} from "@/lib/genlayer/transactions";
 
-const STUDIO_RPC = "https://studio.genlayer.com/api";
-
-async function rpcCall(method: string, params: unknown[]) {
-  const res = await fetch(STUDIO_RPC, {
+async function rpcCall<T>(method: string, params: unknown[]): Promise<T> {
+  const res = await fetch(NETWORK_CONFIG.studionet.rpcUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", id: Date.now(), method, params }),
   });
-  const json = await res.json() as { result?: unknown; error?: { message: string } };
+  const json = await res.json() as { result?: T; error?: { message: string } };
   if (json.error) throw new Error(json.error.message);
-  return json.result;
+  return json.result as T;
 }
+
+type ReceiptResult = { recipient?: string };
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -22,34 +29,40 @@ export async function POST(req: NextRequest) {
   }
 
   const { txHash } = await req.json() as { txHash?: string };
-  if (!txHash) {
+  if (!txHash?.startsWith("0x")) {
     return NextResponse.json({ error: "txHash required" }, { status: 400 });
   }
 
   try {
-    const tx = await rpcCall("eth_getTransactionByHash", [txHash]) as Record<string, unknown> | null;
-    if (!tx) {
-      return NextResponse.json({ error: "Transaction not found" }, { status: 404 });
+    const client = getGenLayerClient() as unknown as GenLayerReadClient;
+    const tx = await client.getTransaction({ hash: txHash as `0x${string}` });
+    let contractAddress = getRecipientAddress(tx);
+    let receipt: ReceiptResult | null = null;
+
+    if (!contractAddress) {
+      receipt = await rpcCall<ReceiptResult>("gen_getTransactionReceipt", [
+        { txId: txHash },
+      ]);
+      const recipient = receipt?.recipient;
+      if (
+        recipient?.startsWith("0x") &&
+        recipient.toLowerCase() !== ZERO_ADDRESS
+      ) {
+        contractAddress = recipient;
+      }
     }
 
-    const data = tx.data as Record<string, unknown> | undefined;
-
-    // Try every plausible location for the deployed contract address
-    const candidates = [
-      data?.to,
-      data?.recipient,
-      data?.contract_address,
-      tx.to_address,
-      tx.recipient,
-      tx.contract_address,
-    ] as (string | undefined)[];
-
-    const ZERO = "0x0000000000000000000000000000000000000000";
-    const contractAddress = candidates.find(
-      (c) => typeof c === "string" && c.startsWith("0x") && c.toLowerCase() !== ZERO.toLowerCase()
-    ) ?? "";
-
-    return NextResponse.json({ contractAddress, _raw: { data } });
+    return NextResponse.json({
+      contractAddress,
+      _raw: {
+        transaction: {
+          recipient: tx.recipient,
+          to_address: tx.to_address,
+          txExecutionResultName: tx.txExecutionResultName,
+        },
+        receipt,
+      },
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: msg }, { status: 502 });

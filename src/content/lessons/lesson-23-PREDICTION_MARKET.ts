@@ -98,7 +98,7 @@ prompt = (
 )
 Then:
 
-result = gl.nondet.exec_prompt(prompt)
+result = gl.vm.run_nondet_unsafe(run, validate_result)
 parts = result.split("|")
 
 assert len(parts) == 2, "AI result must contain outcome and reason"

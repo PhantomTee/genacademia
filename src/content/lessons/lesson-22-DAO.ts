@@ -6,7 +6,7 @@ const content: LessonContent = {
   explanation: `## Lesson 22 — Using gl.nondet.exec_prompt for Proposals
 
 ### What You'll Learn
-Call \`gl.nondet.exec_prompt()\` wrapped in \`gl.eq_principle_strict_eq\` to analyze a proposal with AI.`,
+Call \`gl.nondet.exec_prompt()\` wrapped in \`gl.vm.run_nondet_unsafe\` to analyze a proposal with AI.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 import json
@@ -136,11 +136,11 @@ class GovMind(gl.Contract):
         else:
             self.proposal_statuses[proposal_id] = "rejected"
 `,
-  task: `Add \`analyze_proposal_with_ai(self, proposal_id: str) -> str\`. Build the prompt, define an inner \`run(prompt)\` calling \`gl.nondet.exec_prompt(prompt)\`, call \`gl.eq_principle_strict_eq(run, prompt)\`.`,
+  task: `Add \`analyze_proposal_with_ai(self, proposal_id: str) -> str\`. Build the prompt, define an inner \`run(prompt)\` calling \`gl.nondet.exec_prompt(prompt)\`, call \`gl.vm.run_nondet_unsafe(run, validate_result)\`.`,
   hints: [
-    "Define def run(prompt): inside the method.",
-    "Call gl.eq_principle_strict_eq(run, prompt) — not exec_prompt directly.",
-    "Key line: `return gl.eq_principle_strict_eq(run, prompt)`",
+    "Define def run(): inside the method.",
+    "Call gl.vm.run_nondet_unsafe(run, validate_result) — not exec_prompt directly.",
+    "Key line: `return gl.vm.run_nondet_unsafe(run, validate_result)`",
   ],
 };
 

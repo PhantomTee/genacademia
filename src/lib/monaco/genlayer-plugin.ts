@@ -3,11 +3,11 @@ import type { Monaco } from "@monaco-editor/react";
 // ─── Lint rules ──────────────────────────────────────────────────────────────
 
 const DEPRECATED_APIS = [
-  { re: /gl\.get_webpage\s*\(/, name: "gl.get_webpage()", fix: "gl.nondet.web.render(url, mode='text')" },
+  { re: /gl\.get_webpage\s*\(/, name: "gl.get_webpage()", fix: "gl.nondet.web.get(url)" },
   { re: /gl\.exec_prompt\s*\(/, name: "gl.exec_prompt()", fix: "gl.nondet.exec_prompt(prompt)" },
   { re: /gl\.ContractAt\s*\(/, name: "gl.ContractAt()", fix: "gl.get_contract_at(address)" },
-  { re: /gl\.eq_principle_strict_eq\s*\(/, name: "gl.eq_principle_strict_eq()", fix: "gl.eq_principle.strict_eq(fn)" },
-  { re: /gl\.eq_principle_prompt_comparative\s*\(/, name: "gl.eq_principle_prompt_comparative()", fix: "gl.eq_principle.prompt_comparative(fn, principle)" },
+  { re: /gl\.eq_principle_strict_eq\s*\(/, name: "gl.eq_principle_strict_eq()", fix: "gl.vm.run_nondet_unsafe(leader, validator)" },
+  { re: /gl\.eq_principle_prompt_comparative\s*\(/, name: "gl.eq_principle_prompt_comparative()", fix: "gl.vm.run_nondet_unsafe(leader, validator)" },
 ] as const;
 
 const UNSAFE_IMPORTS = ["requests", "random", "datetime", "time", "urllib", "httpx", "aiohttp"];
@@ -134,7 +134,7 @@ function lint(code: string, monaco: Monaco): any[] {
         const col = line.search(/gl\.nondet/) + 1;
         markers.push({
           severity: monaco.MarkerSeverity.Warning,
-          message: "gl.nondet.* calls should be inside a function passed to gl.eq_principle.strict_eq() or gl.eq_principle.prompt_comparative()",
+          message: "gl.nondet.* calls should be inside a leader function passed to gl.vm.run_nondet_unsafe(leader, validator)",
           startLineNumber: n, startColumn: col, endLineNumber: n, endColumn: col + 10,
         });
       }
@@ -153,15 +153,14 @@ const COMPLETIONS = [
   { label: "@gl.public.write.payable", insert: "@gl.public.write.payable", detail: "decorator", doc: "State-modifying + accepts native token. Access gl.message.value for amount." },
   { label: "@allow_storage", insert: "@allow_storage", detail: "decorator", doc: "Required on custom dataclasses used inside TreeMap or DynArray contract storage." },
   // Non-deterministic
-  { label: "gl.nondet.exec_prompt", insert: "gl.nondet.exec_prompt(${1:prompt})", detail: "gl.nondet", doc: "Run an LLM prompt. Must be inside a function passed to gl.eq_principle.*. Returns str, or dict when response_format='json'." },
-  { label: "gl.nondet.web.render", insert: "gl.nondet.web.render(${1:url}, mode='${2|text,html,screenshot|}')", detail: "gl.nondet.web", doc: "Fetch a webpage. mode='text'→plain text, 'html'→HTML body, 'screenshot'→Image. Must be inside gl.eq_principle.*." },
-  { label: "gl.nondet.web.request", insert: "gl.nondet.web.request(${1:url})", detail: "gl.nondet.web", doc: "HTTP request to an external API. Supports GET and POST. Must be inside gl.eq_principle.*." },
-  // Equivalence principle
-  { label: "gl.eq_principle.strict_eq", insert: "gl.eq_principle.strict_eq(${1:fn})", detail: "gl.eq_principle", doc: "All validators must get identical results (==). Best for deterministic outputs like bool, int, string." },
-  { label: "gl.eq_principle.prompt_comparative", insert: "gl.eq_principle.prompt_comparative(${1:fn}, ${2:principle})", detail: "gl.eq_principle", doc: "NLP-based equivalence: validators check if results mean the same thing. Use when wording varies." },
-  { label: "gl.eq_principle.prompt_non_comparative", insert: "gl.eq_principle.prompt_non_comparative(${1:fn}, task=${2:''}, criteria=${3:''})", detail: "gl.eq_principle", doc: "Leader-only execution; validators verify integrity. Fastest option. Requires task= and criteria= kwargs." },
+  { label: "gl.nondet.exec_prompt", insert: "gl.nondet.exec_prompt(${1:prompt})", detail: "gl.nondet", doc: "Run an LLM prompt inside the leader function passed to gl.vm.run_nondet_unsafe(). Returns str, or dict when response_format='json'." },
+  { label: "gl.nondet.web.get", insert: "gl.nondet.web.get(${1:url})", detail: "gl.nondet.web", doc: "Fetch a URL body as text inside the leader function passed to gl.vm.run_nondet_unsafe()." },
+  { label: "gl.nondet.web.render", insert: "gl.nondet.web.render(${1:url})", detail: "gl.nondet.web", doc: "Render a page screenshot inside the leader function passed to gl.vm.run_nondet_unsafe()." },
+  { label: "gl.nondet.web.request", insert: "gl.nondet.web.request(${1:url})", detail: "gl.nondet.web", doc: "HTTP request to an external API inside the leader function passed to gl.vm.run_nondet_unsafe()." },
+  // Non-determinism
+  { label: "gl.vm.run_nondet_unsafe", insert: "gl.vm.run_nondet_unsafe(${1:leader}, ${2:validator})", detail: "gl.vm", doc: "Run non-deterministic leader logic and validate the leader result on validators." },
   // Message context
-  { label: "gl.message.sender", insert: "gl.message.sender", detail: "Address", doc: "Address of the transaction sender." },
+  { label: "gl.message.sender_address", insert: "gl.message.sender_address", detail: "Address", doc: "Address of the transaction sender." },
   { label: "gl.message.value", insert: "gl.message.value", detail: "u256", doc: "Native token amount sent. Only accessible in @gl.public.write.payable methods." },
   // Contract interaction
   { label: "gl.get_contract_at", insert: "gl.get_contract_at(${1:address})", detail: "gl", doc: "Get a proxy to another deployed contract.\nRead: contract.view().method(args)\nWrite: contract.emit(value=u256(0)).method(args)" },
@@ -184,13 +183,12 @@ const COMPLETIONS = [
 // ─── Hover docs ───────────────────────────────────────────────────────────────
 
 const HOVER: Record<string, string> = {
-  "gl.nondet.exec_prompt": "**`gl.nondet.exec_prompt(prompt, *, response_format?, images?)`**\n\nRun an LLM prompt. Must be inside a function passed to `gl.eq_principle.*`.\n\nReturns `str` by default, `dict` when `response_format='json'`.",
-  "gl.nondet.web.render": "**`gl.nondet.web.render(url, mode='text')`**\n\nFetch a webpage. `'text'`→plain text · `'html'`→HTML body · `'screenshot'`→Image.\n\nMust be inside `gl.eq_principle.*`.",
-  "gl.nondet.web.request": "**`gl.nondet.web.request(url, method='GET', headers?, body?)`**\n\nHTTP request to an external API. Must be inside `gl.eq_principle.*`.",
-  "gl.eq_principle.strict_eq": "**`gl.eq_principle.strict_eq(fn)`**\n\nAll validators must produce identical results (`==`). Best for deterministic outputs.",
-  "gl.eq_principle.prompt_comparative": "**`gl.eq_principle.prompt_comparative(fn, principle)`**\n\nNLP equivalence check. Validators may get slightly different results but must agree they're equivalent.",
-  "gl.eq_principle.prompt_non_comparative": "**`gl.eq_principle.prompt_non_comparative(fn, *, task, criteria)`**\n\nOnly the leader executes the task; validators check integrity. Fastest and cheapest option.",
-  "gl.message.sender": "**`gl.message.sender`** → `Address`\n\nAddress of the transaction sender.",
+  "gl.nondet.exec_prompt": "**`gl.nondet.exec_prompt(prompt, *, response_format?, images?)`**\n\nRun an LLM prompt inside the leader function passed to `gl.vm.run_nondet_unsafe()`.\n\nReturns `str` by default, `dict` when `response_format='json'`.",
+  "gl.nondet.web.get": "**`gl.nondet.web.get(url)`**\n\nFetch a URL body as text inside the leader function passed to `gl.vm.run_nondet_unsafe()`.",
+  "gl.nondet.web.render": "**`gl.nondet.web.render(url)`**\n\nRender a webpage screenshot inside the leader function passed to `gl.vm.run_nondet_unsafe()`.",
+  "gl.nondet.web.request": "**`gl.nondet.web.request(url, method='GET', headers?, body?)`**\n\nHTTP request to an external API inside the leader function passed to `gl.vm.run_nondet_unsafe()`.",
+  "gl.vm.run_nondet_unsafe": "**`gl.vm.run_nondet_unsafe(leader, validator)`**\n\nRun non-deterministic leader logic and validate the leader result on validators.",
+  "gl.message.sender_address": "**`gl.message.sender_address`** -> `Address`\n\nAddress of the transaction sender.",
   "gl.message.value": "**`gl.message.value`** → `u256`\n\nNative token amount sent. Only accessible in `@gl.public.write.payable` methods.",
   "gl.get_contract_at": "**`gl.get_contract_at(address)`** → `ContractProxy`\n\nProxy to another deployed contract.\n\n```python\nc = gl.get_contract_at(addr)\nc.view().read_method()                  # read\nc.emit(value=u256(0)).write_method()    # write\n```",
   "gl.storage.copy_to_memory": "**`gl.storage.copy_to_memory(storage_obj)`**\n\nCopy storage to in-memory format before using inside a non-deterministic block.",

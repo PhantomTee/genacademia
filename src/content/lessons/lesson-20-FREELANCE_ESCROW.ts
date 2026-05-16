@@ -13,6 +13,14 @@ import json
 from genlayer import *
 
 
+@gl.evm.contract_interface
+class _Recipient:
+    class View:
+        pass
+
+    class Write:
+        pass
+
 class TrustLance(gl.Contract):
     owner: Address
     platform_name: str
@@ -146,7 +154,7 @@ class TrustLance(gl.Contract):
         assert not self.freelancer_claimed.get(job_id, False), "Already paid"
         self.freelancer_claimed[job_id] = True
         self.job_statuses[job_id] = "completed"
-        gl.message.recipient_address.transfer(self.job_escrow[job_id])
+        _Recipient(self.job_freelancers[job_id]).emit_transfer(value=self.job_escrow[job_id])
 `,
   task: `The contract is mostly complete. Add a simple \`get_escrow_balance(self, job_id: str) -> str\` view method that returns the locked escrow as a string.`,
   hints: [

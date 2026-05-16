@@ -177,9 +177,15 @@ jobs: TreeMap[int, Job]`,
   {
     category: "AI & Web",
     title: "exec_prompt — plain text",
-    code: `result: str = gl.nondet.exec_prompt(
-    "Is the market condition met? Answer YES or NO."
-)`,
+    code: `def leader() -> str:
+    return gl.nondet.exec_prompt(
+        "Is the market condition met? Answer YES or NO."
+    )
+
+def validator(leader_result) -> bool:
+    return isinstance(leader_result, gl.vm.Return)
+
+result: str = gl.vm.run_nondet_unsafe(leader, validator)`,
     description:
       "Call the LLM within contract execution. Returns a string. Goes through validator equivalence.",
     docUrl: "https://docs.genlayer.com/developers/intelligent-contracts/features/calling-llms",
@@ -188,10 +194,16 @@ jobs: TreeMap[int, Job]`,
   {
     category: "AI & Web",
     title: "exec_prompt — JSON response",
-    code: `result: dict = gl.nondet.exec_prompt(
-    'Return JSON: {"approved": bool, "reason": str}',
-    response_format="json"
-)
+    code: `def leader() -> dict:
+    return gl.nondet.exec_prompt(
+        'Return JSON: {"approved": bool, "reason": str}',
+        response_format="json"
+    )
+
+def validator(leader_result) -> bool:
+    return isinstance(leader_result, gl.vm.Return) and isinstance(leader_result.calldata, dict)
+
+result: dict = gl.vm.run_nondet_unsafe(leader, validator)
 approved = result["approved"]`,
     description:
       "Get structured JSON output from the LLM. Define the schema clearly in your prompt.",
@@ -201,7 +213,13 @@ approved = result["approved"]`,
   {
     category: "AI & Web",
     title: "web.get — fetch URL",
-    code: `content: str = gl.nondet.web.get("https://api.example.com/data")`,
+    code: `def leader() -> str:
+    return gl.nondet.web.get("https://api.example.com/data")
+
+def validator(leader_result) -> bool:
+    return isinstance(leader_result, gl.vm.Return)
+
+content: str = gl.vm.run_nondet_unsafe(leader, validator)`,
     description:
       "Fetch a URL and return the response body as a string. Used for live data oracles.",
     docUrl: "https://docs.genlayer.com/developers/intelligent-contracts/features/web-access",
@@ -210,7 +228,13 @@ approved = result["approved"]`,
   {
     category: "AI & Web",
     title: "web.render — screenshot",
-    code: `image: bytes = gl.nondet.web.render("https://example.com")`,
+    code: `def leader() -> bytes:
+    return gl.nondet.web.render("https://example.com")
+
+def validator(leader_result) -> bool:
+    return isinstance(leader_result, gl.vm.Return)
+
+image: bytes = gl.vm.run_nondet_unsafe(leader, validator)`,
     description:
       "Capture a full-page screenshot of a URL. Returns raw image bytes for use with exec_prompt.",
     docUrl: "https://docs.genlayer.com/developers/intelligent-contracts/features/web-access",
@@ -219,11 +243,17 @@ approved = result["approved"]`,
   {
     category: "AI & Web",
     title: "exec_prompt with images",
-    code: `screenshot = gl.nondet.web.render(url)
-result = gl.nondet.exec_prompt(
-    "What value does the chart show?",
-    images=[screenshot]
-)`,
+    code: `def leader() -> str:
+    screenshot = gl.nondet.web.render(url)
+    return gl.nondet.exec_prompt(
+        "What value does the chart show?",
+        images=[screenshot]
+    )
+
+def validator(leader_result) -> bool:
+    return isinstance(leader_result, gl.vm.Return)
+
+result = gl.vm.run_nondet_unsafe(leader, validator)`,
     description:
       "Pass image bytes to the LLM for visual analysis. Supports multiple images.",
     docUrl: "https://docs.genlayer.com/developers/intelligent-contracts/features/image-processing",
@@ -235,8 +265,10 @@ result = gl.nondet.exec_prompt(
     code: `def leader() -> str:
     return gl.nondet.exec_prompt("What is the outcome?")
 
-def validator(result: str) -> bool:
-    return result in ("YES", "NO")
+def validator(leader_result) -> bool:
+    if not isinstance(leader_result, gl.vm.Return):
+        return False
+    return str(leader_result.calldata).strip().upper() in ("YES", "NO")
 
 outcome = gl.vm.run_nondet_unsafe(leader, validator)`,
     description:
@@ -247,7 +279,14 @@ outcome = gl.vm.run_nondet_unsafe(leader, validator)`,
   {
     category: "Value & Payments",
     title: "Send GEN from contract",
-    code: `gl.send(recipient_address, amount)`,
+    code: `@gl.evm.contract_interface
+class Recipient:
+    class View:
+        pass
+    class Write:
+        pass
+
+Recipient(recipient_address).emit_transfer(value=amount)`,
     description:
       "Transfer GEN from the contract's balance to a recipient address.",
     docUrl: "https://docs.genlayer.com/developers/intelligent-contracts/features/value-transfers",
@@ -255,71 +294,78 @@ outcome = gl.vm.run_nondet_unsafe(leader, validator)`,
   },
   {
     category: "Storage",
-    title: "VectorStorage",
-    code: `search_index: gl.VectorStorage
+    title: "VecDB Vector Store",
+    code: `from dataclasses import dataclass
+import typing
+import numpy as np
 
-# In __init__:
-self.search_index = gl.VectorStorage()
+@allow_storage
+@dataclass
+class StoreValue:
+    item_id: u256
+    text: str
 
-# Add items:
-self.search_index.add(text, {"id": item_id})
-
-# Search:
-results = self.search_index.search(query, top_k=5)`,
+vector_store: VecDB[np.float32, typing.Literal[384], StoreValue]`,
     description:
-      "On-chain semantic vector storage. Embed text and search by meaning.",
+      "Declare vector storage with the current VecDB-based API before inserting embeddings.",
     docUrl: "https://docs.genlayer.com/developers/intelligent-contracts/features/vector-storage",
     unlockedByLesson: 23,
   },
   {
     category: "Contract Interaction",
     title: "Call another contract",
-    code: `result = gl.call_contract(
-    contract_address,
-    "method_name",
-    [arg1, arg2]
-)`,
+    code: `other = gl.get_contract_at(contract_address)
+result = other.view().read_method(arg1)
+
+# Writes are asynchronous messages.
+other.emit(on="finalized").write_method(arg1, arg2)`,
     description:
-      "Call a method on another deployed contract. Returns the method's return value.",
+      "Use view() for synchronous reads and emit() for asynchronous writes.",
     docUrl: "https://docs.genlayer.com/developers/intelligent-contracts/features/interacting-with-intelligent-contracts",
     unlockedByLesson: 24,
   },
   {
     category: "Utilities",
-    title: "gl.get_random_u8",
-    code: `random_byte: int = gl.get_random_u8()  # 0-255`,
+    title: "Seeded Random",
+    code: `import hashlib
+
+seed = gl.message.sender_address.as_hex + str(gl.message.chain_id)
+random_byte = hashlib.sha256(seed.encode()).digest()[0]`,
     description:
-      "Generate a consensus-safe random u8. All validators agree on the same value.",
+      "Use a deterministic seed source so every validator derives the same value.",
     docUrl: "https://docs.genlayer.com/developers/intelligent-contracts/features/random",
     unlockedByLesson: 26,
   },
   {
     category: "Utilities",
-    title: "gl.emit_debug",
-    code: `gl.emit_debug(f"Status: {self.status}, balance: {self.balance}")`,
+    title: "Debug Trace",
+    code: `print(f"Status: {self.status}")
+gl.trace("checkpoint")`,
     description:
-      "Write a debug message to GenLayer Studio logs. Stripped in production. No gas cost.",
+      "Use print for basic logs and gl.trace for GenVM debug output.",
     docUrl: "https://docs.genlayer.com/developers/intelligent-contracts/features/debugging",
     unlockedByLesson: 28,
   },
   {
     category: "Special Methods",
-    title: "__receive_message__",
-    code: `def __receive_message__(self, message: str) -> None:
-    # Handle inter-contract message
+    title: "__handle_undefined_method__",
+    code: `@gl.public.write
+def __handle_undefined_method__(self, method_name: str, args: list, kwargs: dict):
+    # Handle calls to undefined methods
     pass`,
     description:
-      "Called when another contract sends a message to this contract.",
+      "Handle calls that do not match a declared method.",
     docUrl: "https://docs.genlayer.com/developers/intelligent-contracts/features/special-methods",
     unlockedByLesson: 29,
   },
   {
     category: "Special Methods",
-    title: "__receive_value__",
-    code: `def __receive_value__(self, amount: int) -> None:
-    self.balance += amount`,
+    title: "__receive__",
+    code: `@gl.public.write.payable
+def __receive__(self) -> None:
+    amount = gl.message.value`,
     description:
-      "Called when GEN is sent directly to the contract address without a method call.",
+      "Called when value is sent directly to the contract without a method call.",
     docUrl: "https://docs.genlayer.com/developers/intelligent-contracts/features/special-methods",
     unlockedByLesson: 29,
   },

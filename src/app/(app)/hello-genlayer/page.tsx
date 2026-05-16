@@ -5,6 +5,11 @@ import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import type { OnMount } from "@monaco-editor/react";
 import { useGenLayerClient } from "@/lib/wagmi/useGenLayerClient";
+import {
+  connectStudionet,
+  type GenLayerWriteClient,
+  waitForFinalizedSuccess,
+} from "@/lib/genlayer/transactions";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
@@ -62,12 +67,10 @@ export default function HelloGenLayerPage() {
     setDeployState("deploying");
     setDeployError("");
     try {
-      const client = glClient as unknown as {
-        deployContract: (o: { code: string; args: unknown[] }) => Promise<string>;
-        waitForTransactionReceipt: (o: { hash: string }) => Promise<unknown>;
-      };
+      const client = glClient as unknown as GenLayerWriteClient;
+      await connectStudionet(client);
       const hash = await client.deployContract({ code: HELLO_CONTRACT, args: [] });
-      await client.waitForTransactionReceipt({ hash });
+      await waitForFinalizedSuccess(client, hash);
 
       // Fetch address from Studio API now that the tx is finalized
       const addrRes = await fetch("/api/deploy/address", {

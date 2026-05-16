@@ -6,12 +6,20 @@ const content: LessonContent = {
   explanation: `## Lesson 22 — Dispute Review with gl.nondet.exec_prompt
 
 ### What You'll Learn
-Call \`gl.nondet.exec_prompt()\` to send the dispute to the AI and get a verdict. Wrap the call in \`gl.eq_principle_strict_eq\` for validator consensus.`,
+Call \`gl.nondet.exec_prompt()\` to send the dispute to the AI and get a verdict. Wrap the call in \`gl.vm.run_nondet_unsafe\` for validator consensus.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 import json
 from genlayer import *
 
+
+@gl.evm.contract_interface
+class _Recipient:
+    class View:
+        pass
+
+    class Write:
+        pass
 
 class TrustLance(gl.Contract):
     owner: Address
@@ -146,13 +154,13 @@ class TrustLance(gl.Contract):
         assert not self.freelancer_claimed.get(job_id, False), "Already paid"
         self.freelancer_claimed[job_id] = True
         self.job_statuses[job_id] = "completed"
-        gl.message.recipient_address.transfer(self.job_escrow[job_id])
+        _Recipient(self.job_freelancers[job_id]).emit_transfer(value=self.job_escrow[job_id])
 `,
-  task: `Add \`review_dispute_with_ai(self, job_id: str, reason: str) -> str\`. Build a prompt, define an inner function that calls \`gl.nondet.exec_prompt(prompt)\`, then call \`gl.eq_principle_strict_eq(run, prompt)\`.`,
+  task: `Add \`review_dispute_with_ai(self, job_id: str, reason: str) -> str\`. Build a prompt, define an inner function that calls \`gl.nondet.exec_prompt(prompt)\`, then call \`gl.vm.run_nondet_unsafe(run, validate_result)\`.`,
   hints: [
-    "Define a nested def run(prompt): inside the method.",
-    "Call gl.eq_principle_strict_eq(run, prompt) — not exec_prompt directly.",
-    "Key line: `result = gl.eq_principle_strict_eq(run, prompt)`",
+    "Define a nested def run(): inside the method.",
+    "Call gl.vm.run_nondet_unsafe(run, validate_result) — not exec_prompt directly.",
+    "Key line: `result = gl.vm.run_nondet_unsafe(run, validate_result)`",
   ],
 };
 

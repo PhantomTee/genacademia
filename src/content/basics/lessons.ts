@@ -593,7 +593,16 @@ class PredictionMarket(gl.Contract):
         Answer with exactly one word: YES or NO.
         """
 
-        result = gl.nondet.exec_prompt(prompt)
+        def leader() -> str:
+            return gl.nondet.exec_prompt(prompt)
+
+        def validator(leader_result) -> bool:
+            if not isinstance(leader_result, gl.vm.Return):
+                return False
+            answer = str(leader_result.calldata).strip().upper()
+            return answer in ("YES", "NO")
+
+        result = gl.vm.run_nondet_unsafe(leader, validator)
 
         self.outcome = result.strip().upper()
         self.resolved = True
@@ -601,13 +610,13 @@ class PredictionMarket(gl.Contract):
 
 ## How Validator Consensus Works
 
-\`gl.nondet.exec_prompt(prompt)\` sends the prompt to an AI model and returns the response as a string. The call is **non-deterministic** — the AI might return slightly different answers each time.
+\`gl.nondet.exec_prompt(prompt)\` sends the prompt to an AI model and returns the response as a string. Because the call is **non-deterministic**, it runs inside \`gl.vm.run_nondet_unsafe(leader, validator)\` so validators can check the leader output before state changes.
 
-GenLayer handles this through its validator protocol: multiple validators each run the AI call independently, then reach consensus on the result. Only after consensus does the state change get committed on-chain.
+GenLayer handles this through its validator protocol: the leader executes the non-deterministic AI call, and validators run the validator function against the leader result. Only after consensus does the state change get committed on-chain.
 
 ## The nondet Namespace
 
-The \`nondet\` in \`gl.nondet.exec_prompt\` stands for **non-deterministic**. Any operation that might return different results across validators — AI calls, web access — lives in this namespace. It signals to the GenVM that validator consensus is required.
+The \`nondet\` in \`gl.nondet.exec_prompt\` stands for **non-deterministic**. Any operation that might return different results across validators - AI calls, web access - lives in this namespace. Pair it with an explicit validator function so the GenVM knows what counts as an acceptable result.
 
 ## What Comes Next
 

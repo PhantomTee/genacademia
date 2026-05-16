@@ -94,7 +94,13 @@ def resolve_with_ai(self, market_id: str, evidence: str) -> str:
         + ". Return only A or B."
     )
 
-    result = gl.nondet.exec_prompt(prompt)
+    def run():
+        return gl.nondet.exec_prompt(prompt)
+
+    def validate_result(leader_result) -> bool:
+        return isinstance(leader_result, gl.vm.Return) and len(str(leader_result.calldata).strip()) > 0
+
+    result = gl.vm.run_nondet_unsafe(run, validate_result).strip()
 
     assert result == "A" or result == "B", "AI must return A or B"
 

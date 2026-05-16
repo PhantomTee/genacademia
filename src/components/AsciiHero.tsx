@@ -140,7 +140,9 @@ export function AsciiHero() {
   useEffect(() => {
     if (!ready) return;
 
-    timers.current.cycle = setInterval(() => {
+    const activeTimers = timers.current;
+
+    activeTimers.cycle = setInterval(() => {
       setActiveIdx(prev => {
         const next = (prev + 1) % FRAMES.length;
         morphTo(next);
@@ -149,8 +151,8 @@ export function AsciiHero() {
     }, 4000);
 
     return () => {
-      if (timers.current.cycle) clearInterval(timers.current.cycle);
-      if (timers.current.morph) clearInterval(timers.current.morph);
+      if (activeTimers.cycle) clearInterval(activeTimers.cycle);
+      if (activeTimers.morph) clearInterval(activeTimers.morph);
     };
   }, [ready]); // eslint-disable-line react-hooks/exhaustive-deps
 

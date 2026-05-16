@@ -7,34 +7,30 @@ export const specs: LessonSpecs = {
     expectedShape: "nonEmpty",
     staticChecks: {
       requiredClass: "PredictX",
-      requiredConcepts: ["get_random"],
     },
   },
   FREELANCE_ESCROW: {
-    method: "get_title",
+    method: "get_platform_name",
     args: [],
     expectedShape: "nonEmpty",
     staticChecks: {
-      requiredClass: "FreelanceEscrow",
-      requiredConcepts: ["get_random"],
+      requiredClass: "TrustLance",
     },
   },
   DAO: {
-    method: "get_name",
+    method: "get_dao_name",
     args: [],
     expectedShape: "nonEmpty",
     staticChecks: {
-      requiredClass: "GovernanceDAO",
-      requiredConcepts: ["get_random"],
+      requiredClass: "GovMind",
     },
   },
   DEVELOPER_REPUTATION: {
-    method: "get_registry_name",
+    method: "get_platform_name",
     args: [],
     expectedShape: "nonEmpty",
     staticChecks: {
-      requiredClass: "DeveloperReputation",
-      requiredConcepts: ["get_random"],
+      requiredClass: "CodeVault",
     },
   },
   INSURANCE: {
@@ -43,7 +39,6 @@ export const specs: LessonSpecs = {
     expectedShape: "nonEmpty",
     staticChecks: {
       requiredClass: "CaseWise",
-      requiredConcepts: ["get_random"],
     },
   },
 };

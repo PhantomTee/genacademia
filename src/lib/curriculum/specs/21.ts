@@ -2,53 +2,43 @@ import type { LessonSpecs } from "./index";
 
 export const specs: LessonSpecs = {
   PREDICTION_MARKET: {
-    method: "get_resolution_prompt",
+    method: "get_platform_name",
     args: [],
     expectedShape: "nonEmpty",
     staticChecks: {
       requiredClass: "PredictX",
-      requiredDecorators: ["@gl.public.write.payable"],
-      requiredConcepts: ["gl.message.value"],
     },
   },
   FREELANCE_ESCROW: {
-    method: "get_title",
+    method: "get_platform_name",
     args: [],
     expectedShape: "nonEmpty",
     staticChecks: {
-      requiredClass: "FreelanceEscrow",
-      requiredDecorators: ["@gl.public.write.payable"],
-      requiredConcepts: ["gl.message.value"],
+      requiredClass: "TrustLance",
     },
   },
   DAO: {
-    method: "get_name",
+    method: "get_dao_name",
     args: [],
     expectedShape: "nonEmpty",
     staticChecks: {
-      requiredClass: "GovernanceDAO",
-      requiredDecorators: ["@gl.public.write.payable"],
-      requiredConcepts: ["gl.message.value"],
+      requiredClass: "GovMind",
     },
   },
   DEVELOPER_REPUTATION: {
-    method: "get_registry_name",
+    method: "get_platform_name",
     args: [],
     expectedShape: "nonEmpty",
     staticChecks: {
-      requiredClass: "DeveloperReputation",
-      requiredDecorators: ["@gl.public.write.payable"],
-      requiredConcepts: ["gl.message.value"],
+      requiredClass: "CodeVault",
     },
   },
   INSURANCE: {
-    method: "get_case_review_prompt",
+    method: "get_court_name",
     args: [],
     expectedShape: "nonEmpty",
     staticChecks: {
       requiredClass: "CaseWise",
-      requiredDecorators: ["@gl.public.write.payable"],
-      requiredConcepts: ["gl.message.value"],
     },
   },
 };

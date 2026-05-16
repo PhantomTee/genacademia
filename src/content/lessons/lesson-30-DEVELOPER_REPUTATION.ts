@@ -13,6 +13,15 @@ import json
 from genlayer import *
 
 
+@gl.evm.contract_interface
+class _Recipient:
+    class View:
+        pass
+
+    class Write:
+        pass
+
+
 class CodeVault(gl.Contract):
     owner: Address
     platform_name: str
@@ -141,7 +150,7 @@ class CodeVault(gl.Contract):
         self.purchase_statuses[listing_id] = "completed"
         self.listing_statuses[listing_id] = "sold"
         seller = self.listing_sellers[listing_id]
-        seller.transfer(self.purchase_escrow[listing_id])
+        _Recipient(seller).emit_transfer(value=self.purchase_escrow[listing_id])
 
     @gl.public.view
     def get_source_hash(self, listing_id: str) -> str:
@@ -164,12 +173,17 @@ class CodeVault(gl.Contract):
             f"Respond with JSON: {{\\"verdict\\": \\"approve\\" or \\"reject\\", "
             f"\\"quality_score\\": 0-100, \\"explanation\\": \\"reason\\"}}"
         )
-        def run(prompt):
-            result = gl.nondet.exec_prompt(prompt)
-            import re
-            m = re.search(r'\\{.*\\}', result, re.DOTALL)
-            return m.group(0) if m else result
-        result = gl.eq_principle_strict_eq(run, prompt)
+        def run():
+            return gl.nondet.exec_prompt(prompt, response_format="json")
+
+        def validate_result(leader_result) -> bool:
+            if not isinstance(leader_result, gl.vm.Return):
+                return False
+            data = leader_result.calldata
+            return isinstance(data, dict) and len(data) > 0
+
+        result = gl.vm.run_nondet_unsafe(run, validate_result)
+        result = json.dumps(result, sort_keys=True)
         self.listing_ai_verdicts[listing_id] = result
         return result
 

@@ -108,7 +108,13 @@ def review_case_with_ai(self, case_id: str) -> str:
         + "or NEEDS_MORE_INFO|LOW|reason, NEEDS_MORE_INFO|MEDIUM|reason, NEEDS_MORE_INFO|HIGH|reason."
     )
 
-    result = gl.nondet.exec_prompt(prompt)
+    def run():
+        return gl.nondet.exec_prompt(prompt)
+
+    def validate_result(leader_result) -> bool:
+        return isinstance(leader_result, gl.vm.Return) and len(str(leader_result.calldata).strip()) > 0
+
+    result = gl.vm.run_nondet_unsafe(run, validate_result).strip()
     parts = result.split("|")
 
     assert len(parts) == 3, "AI result must contain ruling, confidence, and reason"

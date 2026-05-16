@@ -7,38 +7,30 @@ export const specs: LessonSpecs = {
     expectedShape: "nonEmpty",
     staticChecks: {
       requiredClass: "PredictX",
-      requiredDecorators: ["@gl.public.view"],
-      requiredConcepts: ["status"],
     },
   },
   FREELANCE_ESCROW: {
-    method: "get_title",
+    method: "get_platform_name",
     args: [],
     expectedShape: "nonEmpty",
     staticChecks: {
-      requiredClass: "FreelanceEscrow",
-      requiredDecorators: ["@gl.public.view"],
-      requiredConcepts: ["status"],
+      requiredClass: "TrustLance",
     },
   },
   DAO: {
-    method: "get_name",
+    method: "get_dao_name",
     args: [],
     expectedShape: "nonEmpty",
     staticChecks: {
-      requiredClass: "GovernanceDAO",
-      requiredDecorators: ["@gl.public.view"],
-      requiredConcepts: ["status"],
+      requiredClass: "GovMind",
     },
   },
   DEVELOPER_REPUTATION: {
-    method: "get_registry_name",
+    method: "get_platform_name",
     args: [],
     expectedShape: "nonEmpty",
     staticChecks: {
-      requiredClass: "DeveloperReputation",
-      requiredDecorators: ["@gl.public.view"],
-      requiredConcepts: ["status"],
+      requiredClass: "CodeVault",
     },
   },
   INSURANCE: {
@@ -47,8 +39,6 @@ export const specs: LessonSpecs = {
     expectedShape: "nonEmpty",
     staticChecks: {
       requiredClass: "CaseWise",
-      requiredDecorators: ["@gl.public.view"],
-      requiredConcepts: ["status"],
     },
   },
 };

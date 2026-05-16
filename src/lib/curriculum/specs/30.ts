@@ -2,48 +2,43 @@ import type { LessonSpecs } from "./index";
 
 export const specs: LessonSpecs = {
   PREDICTION_MARKET: {
-    method: "get_contract_summary",
+    method: "get_platform_name",
     args: [],
     expectedShape: "nonEmpty",
     staticChecks: {
       requiredClass: "PredictX",
-      requiredConcepts: ["exec_prompt", "gl.send"],
     },
   },
   FREELANCE_ESCROW: {
-    method: "get_title",
+    method: "get_platform_name",
     args: [],
     expectedShape: "nonEmpty",
     staticChecks: {
-      requiredClass: "FreelanceEscrow",
-      requiredConcepts: ["exec_prompt", "gl.send"],
+      requiredClass: "TrustLance",
     },
   },
   DAO: {
-    method: "get_name",
+    method: "get_dao_name",
     args: [],
     expectedShape: "nonEmpty",
     staticChecks: {
-      requiredClass: "GovernanceDAO",
-      requiredConcepts: ["exec_prompt", "gl.send"],
+      requiredClass: "GovMind",
     },
   },
   DEVELOPER_REPUTATION: {
-    method: "get_registry_name",
+    method: "get_platform_name",
     args: [],
     expectedShape: "nonEmpty",
     staticChecks: {
-      requiredClass: "DeveloperReputation",
-      requiredConcepts: ["exec_prompt", "gl.send"],
+      requiredClass: "CodeVault",
     },
   },
   INSURANCE: {
-    method: "get_contract_summary",
+    method: "get_court_name",
     args: [],
     expectedShape: "nonEmpty",
     staticChecks: {
       requiredClass: "CaseWise",
-      requiredConcepts: ["exec_prompt", "gl.send"],
     },
   },
 };

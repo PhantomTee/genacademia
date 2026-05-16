@@ -265,7 +265,13 @@ class CaseWise(gl.Contract):
             + "or NEEDS_MORE_INFO|LOW|reason, NEEDS_MORE_INFO|MEDIUM|reason, NEEDS_MORE_INFO|HIGH|reason."
         )
 
-        result = gl.nondet.exec_prompt(prompt)
+        def run():
+            return gl.nondet.exec_prompt(prompt)
+
+        def validate_result(leader_result) -> bool:
+            return isinstance(leader_result, gl.vm.Return) and len(str(leader_result.calldata).strip()) > 0
+
+        result = gl.vm.run_nondet_unsafe(run, validate_result).strip()
         parts = result.split("|")
 
         assert len(parts) == 3, "AI result must contain ruling, confidence, and reason"
@@ -787,13 +793,13 @@ def can_unlock_source(self, escrow_id: str) -> bool:
 Explanation: Never unlock private source while escrow is only locked.
 
 25. AI prompt execution
-result = gl.nondet.exec_prompt(prompt)
+result = gl.vm.run_nondet_unsafe(run, validate_result)
 Explanation: Asks AI to evaluate text or evidence.
 
 GenLayer is designed around AI-powered Intelligent Contracts that can reason about subjective decisions and real-world context. 
 
 26. Structured AI output
-result = gl.nondet.exec_prompt(prompt)
+result = gl.vm.run_nondet_unsafe(run, validate_result)
 parts = result.split("|")
 
 assert len(parts) == 3, "AI result must contain verdict, confidence, and reason"

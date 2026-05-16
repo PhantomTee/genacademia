@@ -6,11 +6,20 @@ const content: LessonContent = {
   explanation: `## Lesson 22 — Using gl.nondet.exec_prompt for Code Review
 
 ### What You'll Learn
-Call \`gl.nondet.exec_prompt()\` wrapped in \`gl.eq_principle_strict_eq\` to evaluate a listing.`,
+Call \`gl.nondet.exec_prompt()\` wrapped in \`gl.vm.run_nondet_unsafe\` to evaluate a listing.`,
   starterCode: `# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 import json
 from genlayer import *
+
+
+@gl.evm.contract_interface
+class _Recipient:
+    class View:
+        pass
+
+    class Write:
+        pass
 
 
 class CodeVault(gl.Contract):
@@ -141,18 +150,18 @@ class CodeVault(gl.Contract):
         self.purchase_statuses[listing_id] = "completed"
         self.listing_statuses[listing_id] = "sold"
         seller = self.listing_sellers[listing_id]
-        seller.transfer(self.purchase_escrow[listing_id])
+        _Recipient(seller).emit_transfer(value=self.purchase_escrow[listing_id])
 
     @gl.public.view
     def get_source_hash(self, listing_id: str) -> str:
         assert self.purchase_statuses.get(listing_id, "") == "completed", "Purchase must be completed to access source"
         return self.listing_source_hashes[listing_id]
 `,
-  task: `Add \`evaluate_listing_with_ai(self, listing_id: str) -> str\`. Build the prompt, define inner \`run(prompt)\`, call \`gl.eq_principle_strict_eq(run, prompt)\`.`,
+  task: `Add \`evaluate_listing_with_ai(self, listing_id: str) -> str\`. Build the prompt, define inner \`run(prompt)\`, call \`gl.vm.run_nondet_unsafe(run, validate_result)\`.`,
   hints: [
-    "Define a nested def run(prompt): inside the method.",
-    "Call gl.eq_principle_strict_eq(run, prompt).",
-    "Key line: `return gl.eq_principle_strict_eq(run, prompt)`",
+    "Define a nested def run(): inside the method.",
+    "Call gl.vm.run_nondet_unsafe(run, validate_result).",
+    "Key line: `return gl.vm.run_nondet_unsafe(run, validate_result)`",
   ],
 };
 

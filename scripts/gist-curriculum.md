@@ -26,7 +26,7 @@ What they do
 They do not write a full contract yet. They inspect the final direction and complete a tiny starter check so the platform knows they understand the project.
 
 Starter code
-# { "Depends": "py-genlayer:test" }
+# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 from genlayer import *
 
@@ -43,7 +43,7 @@ class PredictX(gl.Contract):
 Explanation
 The contract begins with the dependency header:
 
-# { "Depends": "py-genlayer:test" }
+# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 Then it imports GenLayer:
 
 from genlayer import *
@@ -84,7 +84,7 @@ What they do
 They create the first real contract skeleton with an owner and a platform name.
 
 Starter code
-# { "Depends": "py-genlayer:test" }
+# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 from genlayer import *
 
@@ -115,7 +115,7 @@ Then initialize it in the constructor with:
 
 A GenLayer prediction market that uses AI-assisted resolution.
 Expected final code
-# { "Depends": "py-genlayer:test" }
+# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 from genlayer import *
 
@@ -146,7 +146,7 @@ What students learn
 Students learn how to expose read-only contract state using @gl.public.view.
 
 Starter code
-# { "Depends": "py-genlayer:test" }
+# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 from genlayer import *
 
@@ -179,7 +179,7 @@ get_owner() should return the owner as hex:
 
 return self.owner.as_hex
 Expected final code
-# { "Depends": "py-genlayer:test" }
+# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 from genlayer import *
 
@@ -231,7 +231,7 @@ Students learn how to modify state using @gl.public.write, and why write methods
 Writing to Intelligent Contracts modifies state and needs network processing, unlike read calls. 
 
 Starter code
-# { "Depends": "py-genlayer:test" }
+# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 from genlayer import *
 
@@ -266,7 +266,7 @@ Rules:
 Only owner can update it.
 Description cannot be empty.
 Expected final code
-# { "Depends": "py-genlayer:test" }
+# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 from genlayer import *
 
@@ -330,7 +330,7 @@ get_contract_summary()
 It should return a readable string containing the name and description.
 
 Expected final code
-# { "Depends": "py-genlayer:test" }
+# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 from genlayer import *
 
@@ -607,7 +607,7 @@ Use it to generate IDs:
 market_id = str(self.market_count)
 self.market_count += u256(1)
 Expected final code after Lesson 10
-# { "Depends": "py-genlayer:test" }
+# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 from genlayer import *
 
@@ -1205,7 +1205,17 @@ def resolve_with_ai(self, market_id: str, evidence: str) -> str:
         + ". Return only A or B."
     )
 
-    result = gl.nondet.exec_prompt(prompt)
+    def run():
+
+        return gl.nondet.exec_prompt(prompt)
+
+
+    def validate_result(leader_result) -> bool:
+
+        return isinstance(leader_result, gl.vm.Return) and len(str(leader_result.calldata).strip()) > 0
+
+
+    result = gl.vm.run_nondet_unsafe(run, validate_result)
 
     assert result == "A" or result == "B", "AI must return A or B"
 
@@ -1261,7 +1271,17 @@ prompt = (
 )
 Then:
 
-result = gl.nondet.exec_prompt(prompt)
+def run():
+
+    return gl.nondet.exec_prompt(prompt)
+
+
+def validate_result(leader_result) -> bool:
+
+    return isinstance(leader_result, gl.vm.Return) and len(str(leader_result.calldata).strip()) > 0
+
+
+result = gl.vm.run_nondet_unsafe(run, validate_result)
 parts = result.split("|")
 
 assert len(parts) == 2, "AI result must contain outcome and reason"
@@ -1349,7 +1369,17 @@ def resolve_with_ai(self, market_id: str, evidence: str) -> str:
         + ". Return exactly one line in this format: A|reason or B|reason."
     )
 
-    result = gl.nondet.exec_prompt(prompt)
+    def run():
+
+        return gl.nondet.exec_prompt(prompt)
+
+
+    def validate_result(leader_result) -> bool:
+
+        return isinstance(leader_result, gl.vm.Return) and len(str(leader_result.calldata).strip()) > 0
+
+
+    result = gl.vm.run_nondet_unsafe(run, validate_result)
     parts = result.split("|")
 
     assert len(parts) == 2, "AI result must contain outcome and reason"
@@ -1525,7 +1555,7 @@ What students learn
 Students finalize, explain, and prepare their contract for deployment.
 
 Final PredictX contract
-# { "Depends": "py-genlayer:test" }
+# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 import json
 from genlayer import *
@@ -1726,7 +1756,17 @@ class PredictX(gl.Contract):
             + ". Return exactly one line in this format: A|reason or B|reason."
         )
 
-        result = gl.nondet.exec_prompt(prompt)
+        def run():
+
+            return gl.nondet.exec_prompt(prompt)
+
+
+        def validate_result(leader_result) -> bool:
+
+            return isinstance(leader_result, gl.vm.Return) and len(str(leader_result.calldata).strip()) > 0
+
+
+        result = gl.vm.run_nondet_unsafe(run, validate_result)
         parts = result.split("|")
 
         assert len(parts) == 2, "AI result must contain outcome and reason"
@@ -1894,7 +1934,7 @@ appeal flow
 The AI does not magically replace the court or arbitrator. It helps review the claims and evidence, then produces a structured recommendation.
 
 Starter code
-# { "Depends": "py-genlayer:test" }
+# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 from genlayer import *
 
@@ -1913,7 +1953,7 @@ Change the project name to:
 
 CaseWise: AI-Assisted Dispute Resolution
 Expected final code
-# { "Depends": "py-genlayer:test" }
+# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 from genlayer import *
 
@@ -1956,7 +1996,7 @@ persistent owner
 constructor
 court name
 Starter code
-# { "Depends": "py-genlayer:test" }
+# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 from genlayer import *
 
@@ -1982,7 +2022,7 @@ Initialize it with:
 
 Parties submit cases and evidence for AI-assisted review.
 Expected final code
-# { "Depends": "py-genlayer:test" }
+# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 from genlayer import *
 
@@ -2024,7 +2064,7 @@ court name
 court rules
 owner/arbitrator address
 Starter code
-# { "Depends": "py-genlayer:test" }
+# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 from genlayer import *
 
@@ -2051,7 +2091,7 @@ get_owner() should return:
 
 self.owner.as_hex
 Expected final code
-# { "Depends": "py-genlayer:test" }
+# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 from genlayer import *
 
@@ -2104,7 +2144,7 @@ Students learn how to update contract state using @gl.public.write.
 They also learn that only the owner should be able to update the dispute court rules.
 
 Starter code
-# { "Depends": "py-genlayer:test" }
+# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 from genlayer import *
 
@@ -2139,7 +2179,7 @@ Rules:
 Only owner can update rules.
 Rules cannot be empty.
 Expected final code
-# { "Depends": "py-genlayer:test" }
+# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 from genlayer import *
 
@@ -2221,7 +2261,7 @@ get_contract_summary()
 It should return the court name and rules together.
 
 Expected final code
-# { "Depends": "py-genlayer:test" }
+# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 from genlayer import *
 
@@ -2512,7 +2552,7 @@ Use:
 case_id = str(self.case_count)
 self.case_count += u256(1)
 Expected final code after Lesson 10
-# { "Depends": "py-genlayer:test" }
+# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 from genlayer import *
 
@@ -3250,7 +3290,17 @@ def review_case_with_ai(self, case_id: str) -> str:
         + ". Return only CLAIMANT_WINS, RESPONDENT_WINS, SPLIT, or NEEDS_MORE_INFO."
     )
 
-    result = gl.nondet.exec_prompt(prompt)
+    def run():
+
+        return gl.nondet.exec_prompt(prompt)
+
+
+    def validate_result(leader_result) -> bool:
+
+        return isinstance(leader_result, gl.vm.Return) and len(str(leader_result.calldata).strip()) > 0
+
+
+    result = gl.vm.run_nondet_unsafe(run, validate_result)
 
     assert (
         result == "CLAIMANT_WINS"
@@ -3298,7 +3348,13 @@ Update AI review to split output with:
 
 parts = result.split("|")
 Expected code pattern
-result = gl.nondet.exec_prompt(prompt)
+def run():
+    return gl.nondet.exec_prompt(prompt)
+
+def validate_result(leader_result) -> bool:
+    return isinstance(leader_result, gl.vm.Return) and len(str(leader_result.calldata).strip()) > 0
+
+result = gl.vm.run_nondet_unsafe(run, validate_result)
 parts = result.split("|")
 
 assert len(parts) == 3, "AI result must contain ruling, confidence, and reason"
@@ -3431,7 +3487,17 @@ def review_case_with_ai(self, case_id: str) -> str:
         + "or NEEDS_MORE_INFO|LOW|reason, NEEDS_MORE_INFO|MEDIUM|reason, NEEDS_MORE_INFO|HIGH|reason."
     )
 
-    result = gl.nondet.exec_prompt(prompt)
+    def run():
+
+        return gl.nondet.exec_prompt(prompt)
+
+
+    def validate_result(leader_result) -> bool:
+
+        return isinstance(leader_result, gl.vm.Return) and len(str(leader_result.calldata).strip()) > 0
+
+
+    result = gl.vm.run_nondet_unsafe(run, validate_result)
     parts = result.split("|")
 
     assert len(parts) == 3, "AI result must contain ruling, confidence, and reason"
@@ -3707,7 +3773,7 @@ how manual rulings work
 how appeals work
 how frontend reads case state
 Final CaseWise contract
-# { "Depends": "py-genlayer:test" }
+# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 import json
 from genlayer import *
@@ -3952,7 +4018,17 @@ class CaseWise(gl.Contract):
             + "or NEEDS_MORE_INFO|LOW|reason, NEEDS_MORE_INFO|MEDIUM|reason, NEEDS_MORE_INFO|HIGH|reason."
         )
 
-        result = gl.nondet.exec_prompt(prompt)
+        def run():
+
+            return gl.nondet.exec_prompt(prompt)
+
+
+        def validate_result(leader_result) -> bool:
+
+            return isinstance(leader_result, gl.vm.Return) and len(str(leader_result.calldata).strip()) > 0
+
+
+        result = gl.vm.run_nondet_unsafe(run, validate_result)
         parts = result.split("|")
 
         assert len(parts) == 3, "AI result must contain ruling, confidence, and reason"
@@ -4326,7 +4402,7 @@ Glossary entries to include
 1. Dependency header
 Use when: starting every GenLayer contract.
 
-# { "Depends": "py-genlayer:test" }
+# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 Explanation: Tells GenLayer which dependency package the contract needs.
 
 2. Import GenLayer
@@ -4474,13 +4550,25 @@ def can_unlock_source(self, escrow_id: str) -> bool:
 Explanation: Never unlock private source while escrow is only locked.
 
 25. AI prompt execution
-result = gl.nondet.exec_prompt(prompt)
+def run():
+    return gl.nondet.exec_prompt(prompt)
+
+def validate_result(leader_result) -> bool:
+    return isinstance(leader_result, gl.vm.Return) and len(str(leader_result.calldata).strip()) > 0
+
+result = gl.vm.run_nondet_unsafe(run, validate_result)
 Explanation: Asks AI to evaluate text or evidence.
 
 GenLayer is designed around AI-powered Intelligent Contracts that can reason about subjective decisions and real-world context. 
 
 26. Structured AI output
-result = gl.nondet.exec_prompt(prompt)
+def run():
+    return gl.nondet.exec_prompt(prompt)
+
+def validate_result(leader_result) -> bool:
+    return isinstance(leader_result, gl.vm.Return) and len(str(leader_result.calldata).strip()) > 0
+
+result = gl.vm.run_nondet_unsafe(run, validate_result)
 parts = result.split("|")
 
 assert len(parts) == 3, "AI result must contain verdict, confidence, and reason"

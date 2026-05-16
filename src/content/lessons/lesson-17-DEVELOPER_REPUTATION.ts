@@ -13,6 +13,15 @@ import json
 from genlayer import *
 
 
+@gl.evm.contract_interface
+class _Recipient:
+    class View:
+        pass
+
+    class Write:
+        pass
+
+
 class CodeVault(gl.Contract):
     owner: Address
     platform_name: str
@@ -137,7 +146,7 @@ class CodeVault(gl.Contract):
   hints: [
     "Assert sender == purchase_buyers[listing_id].",
     "Check seller_claimed[listing_id] is False before paying.",
-    "Key line: `seller.transfer(self.purchase_escrow[listing_id])`",
+    "Key line: `_Recipient(seller).emit_transfer(value=self.purchase_escrow[listing_id])`",
   ],
 };
 

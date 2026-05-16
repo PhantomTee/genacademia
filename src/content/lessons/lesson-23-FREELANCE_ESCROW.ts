@@ -13,6 +13,14 @@ import json
 from genlayer import *
 
 
+@gl.evm.contract_interface
+class _Recipient:
+    class View:
+        pass
+
+    class Write:
+        pass
+
 class TrustLance(gl.Contract):
     owner: Address
     platform_name: str
@@ -146,7 +154,7 @@ class TrustLance(gl.Contract):
         assert not self.freelancer_claimed.get(job_id, False), "Already paid"
         self.freelancer_claimed[job_id] = True
         self.job_statuses[job_id] = "completed"
-        gl.message.recipient_address.transfer(self.job_escrow[job_id])
+        _Recipient(self.job_freelancers[job_id]).emit_transfer(value=self.job_escrow[job_id])
 
     @gl.public.write
     def review_dispute_with_ai(self, job_id: str, reason: str) -> str:
@@ -162,12 +170,17 @@ class TrustLance(gl.Contract):
             f"Respond with JSON: {{\\"verdict\\": \\"release\\" or \\"refund\\", "
             f"\\"confidence\\": 0-100, \\"reason\\": \\"explanation\\"}}"
         )
-        def run(prompt):
-            result = gl.nondet.exec_prompt(prompt)
-            import re
-            m = re.search(r'\\{.*\\}', result, re.DOTALL)
-            return m.group(0) if m else result
-        result = gl.eq_principle_strict_eq(run, prompt)
+        def run():
+            return gl.nondet.exec_prompt(prompt, response_format="json")
+
+        def validate_result(leader_result) -> bool:
+            if not isinstance(leader_result, gl.vm.Return):
+                return False
+            data = leader_result.calldata
+            return isinstance(data, dict) and len(data) > 0
+
+        result = gl.vm.run_nondet_unsafe(run, validate_result)
+        result = json.dumps(result, sort_keys=True)
         return result
 `,
   task: `Refine \`review_dispute_with_ai\` to extract JSON from the AI response using a regex. If extraction fails, return the raw text. The result must be identical across validators.`,

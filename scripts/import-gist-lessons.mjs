@@ -139,6 +139,24 @@ function fixHash(code) {
   return code.replace(/py-genlayer:test/g, REAL_HASH);
 }
 
+function fixGenLayerApiDrift(code) {
+  return fixHash(code)
+    .replace(
+      /^(\s*)result = gl\.nondet\.exec_prompt\(prompt\)$/gm,
+      [
+        "$1def run():",
+        "$1    return gl.nondet.exec_prompt(prompt)",
+        "",
+        "$1def validate_result(leader_result) -> bool:",
+        "$1    return isinstance(leader_result, gl.vm.Return) and len(str(leader_result.calldata).strip()) > 0",
+        "",
+        "$1result = gl.vm.run_nondet_unsafe(run, validate_result)",
+      ].join("\n")
+    )
+    .replace(/gl\.eq_principle_strict_eq\(/g, "gl.vm.run_nondet_unsafe(")
+    .replace(/gl\.eq_principle_prompt_comparative\(/g, "gl.vm.run_nondet_unsafe(");
+}
+
 // ── Build markdown explanation from gist sections ─────────────────────────────
 function buildExplanation(title, lessonId, sections) {
   const parts = [`## Lesson ${lessonId} — ${title}`, ""];
@@ -217,7 +235,7 @@ function extractCode(lines) {
   // Strip leading/trailing blank lines
   const trimmed = lines.join("\n").trim();
   if (!trimmed) return "";
-  return fixHash(trimmed) + "\n";
+  return fixGenLayerApiDrift(trimmed) + "\n";
 }
 
 // ── Checks whether a string looks like actual Python contract code ─────────────

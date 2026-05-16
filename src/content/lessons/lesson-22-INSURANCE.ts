@@ -97,7 +97,13 @@ def review_case_with_ai(self, case_id: str) -> str:
         + ". Return only CLAIMANT_WINS, RESPONDENT_WINS, SPLIT, or NEEDS_MORE_INFO."
     )
 
-    result = gl.nondet.exec_prompt(prompt)
+    def run():
+        return gl.nondet.exec_prompt(prompt)
+
+    def validate_result(leader_result) -> bool:
+        return isinstance(leader_result, gl.vm.Return) and len(str(leader_result.calldata).strip()) > 0
+
+    result = gl.vm.run_nondet_unsafe(run, validate_result).strip()
 
     assert (
         result == "CLAIMANT_WINS"

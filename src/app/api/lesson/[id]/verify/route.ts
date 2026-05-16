@@ -56,8 +56,8 @@ export async function POST(
 
   // Run static analysis if code was submitted
   let staticResult: { passed: boolean; failures: string[] } | undefined;
-  if (code && spec.staticChecks) {
-    staticResult = runStaticVerification(code, spec.staticChecks);
+  if (code) {
+    staticResult = runStaticVerification(code, spec.staticChecks ?? {});
   }
 
   // Run RPC verification if contract address provided; fall back to static-only
@@ -70,18 +70,25 @@ export async function POST(
     }
   }
 
-  // Determine overall success: static pass OR rpc pass
+  // If both code and a deployed address are supplied, both checks must pass.
   const staticPassed = staticResult?.passed ?? false;
   const rpcPassed = rpcResult?.success ?? false;
-  const success = staticPassed || rpcPassed;
+  const hasEvidence = Boolean(code || contractAddress);
+  const success =
+    hasEvidence &&
+    (code ? staticPassed : true) &&
+    (contractAddress ? rpcPassed : true);
 
-  const message = rpcPassed
-    ? rpcResult!.message
-    : staticPassed
-    ? "Code analysis passed — all required concepts found."
-    : staticResult
-    ? `Code analysis failed: ${staticResult.failures.join("; ")}`
-    : "No contract address and no code submitted.";
+  const message =
+    code && !staticPassed && staticResult
+      ? `Code analysis failed: ${staticResult.failures.join("; ")}`
+      : contractAddress && !rpcPassed
+      ? rpcResult?.message ?? "Contract verification failed or RPC was unavailable."
+      : rpcPassed
+      ? rpcResult!.message
+      : staticPassed
+      ? "Code analysis passed - all required concepts found."
+      : "No contract address and no code submitted.";
 
   if (success) {
     const { getLesson, getLessonsInGroup } = await import(

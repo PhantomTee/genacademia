@@ -2,6 +2,11 @@
 
 import { useState } from "react";
 import { useGenLayerClient } from "@/lib/wagmi/useGenLayerClient";
+import {
+  connectStudionet,
+  type GenLayerWriteClient,
+  waitForFinalizedSuccess,
+} from "@/lib/genlayer/transactions";
 
 type DeployState = "idle" | "deploying" | "polling" | "success" | "error";
 
@@ -38,14 +43,14 @@ export function DeployPanel({ lessonId, code, onDeployed }: Props) {
     setStatusLabel("Deploying...");
 
     try {
-      const hash = await (glClient as unknown as { deployContract: (o: { code: string; args: unknown[] }) => Promise<string> }).deployContract({ code, args: [] });
+      const client = glClient as unknown as GenLayerWriteClient;
+      await connectStudionet(client);
+      const hash = await client.deployContract({ code, args: [] });
       setTxHash(hash);
       setState("polling");
       setStatusLabel(STATUS_LABELS.PENDING);
 
-      await (glClient as unknown as {
-        waitForTransactionReceipt: (o: { hash: string }) => Promise<unknown>;
-      }).waitForTransactionReceipt({ hash });
+      await waitForFinalizedSuccess(client, hash);
       setStatusLabel(STATUS_LABELS.FINALIZED);
 
       // Fetch deployed address from Studio API now that the tx is finalized

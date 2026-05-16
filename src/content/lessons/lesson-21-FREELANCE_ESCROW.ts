@@ -16,6 +16,14 @@ import json
 from genlayer import *
 
 
+@gl.evm.contract_interface
+class _Recipient:
+    class View:
+        pass
+
+    class Write:
+        pass
+
 class TrustLance(gl.Contract):
     owner: Address
     platform_name: str
@@ -149,7 +157,7 @@ class TrustLance(gl.Contract):
         assert not self.freelancer_claimed.get(job_id, False), "Already paid"
         self.freelancer_claimed[job_id] = True
         self.job_statuses[job_id] = "completed"
-        gl.message.recipient_address.transfer(self.job_escrow[job_id])
+        _Recipient(self.job_freelancers[job_id]).emit_transfer(value=self.job_escrow[job_id])
 `,
   task: `Add \`get_dispute_prompt(self, job_id: str, reason: str) -> str\` as a \`@gl.public.view\` method. Return a prompt string that includes the job description, delivery reference, and reason.`,
   hints: [
