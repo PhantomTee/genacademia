@@ -20,7 +20,20 @@ async function rpcCall<T>(method: string, params: unknown[]): Promise<T> {
   return json.result as T;
 }
 
-type ReceiptResult = { recipient?: string };
+type ReceiptResult = {
+  recipient?: string;
+  data?: {
+    contract_address?: string;
+  };
+};
+
+function isAddress(value: unknown): value is `0x${string}` {
+  return (
+    typeof value === "string" &&
+    value.startsWith("0x") &&
+    value.toLowerCase() !== ZERO_ADDRESS
+  );
+}
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -43,12 +56,11 @@ export async function POST(req: NextRequest) {
       receipt = await rpcCall<ReceiptResult>("gen_getTransactionReceipt", [
         { txId: txHash },
       ]);
-      const recipient = receipt?.recipient;
-      if (
-        recipient?.startsWith("0x") &&
-        recipient.toLowerCase() !== ZERO_ADDRESS
-      ) {
-        contractAddress = recipient;
+      const deployedAddress = receipt?.data?.contract_address;
+      if (isAddress(deployedAddress)) {
+        contractAddress = deployedAddress;
+      } else if (isAddress(receipt?.recipient)) {
+        contractAddress = receipt.recipient;
       }
     }
 
