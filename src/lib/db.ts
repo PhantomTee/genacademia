@@ -1,10 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";
-import dns from "dns";
-
-// Local DNS server is unreachable; fall back to Google DNS for all lookups.
-dns.setServers(["8.8.8.8", "8.8.4.4"]);
 
 // pg's URL parser breaks on # in passwords. Parse manually into a config object.
 function parseDbUrl(url: string): pg.PoolConfig {

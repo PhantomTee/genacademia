@@ -1,6 +1,7 @@
 import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { verifyBasicsCompletionCookie } from "@/lib/basics-gate";
 
 const PROTECTED = ["/dashboard", "/lesson", "/profile", "/cheatsheet"];
 const ONBOARDING = ["/onboarding"];
@@ -29,7 +30,10 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
-  const basicsComplete = req.cookies.get("ga-basics")?.value === "1";
+  const basicsComplete = await verifyBasicsCompletionCookie(
+    req.cookies.get("ga-basics")?.value,
+    token?.walletAddress
+  );
 
   // Logged in + has track + hasn't done basics → force /basics (but allow /basics itself)
   if (token && token.projectPath && !basicsComplete && isProtected) {

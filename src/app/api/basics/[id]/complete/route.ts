@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import {
+  basicsCookieOptions,
+  createBasicsCompletionCookie,
+  shouldUnlockBasics,
+} from "@/lib/basics-gate";
 import { prisma } from "@/lib/db";
 
 export async function POST(
@@ -38,14 +43,12 @@ export async function POST(
 
   const res = NextResponse.json({ ok: true });
 
-  // Unlock the main curriculum after completing lesson 3
-  if (lessonId >= 3) {
-    res.cookies.set("ga-basics", "1", {
-      httpOnly: true,
-      path: "/",
-      maxAge: 60 * 60 * 24 * 365,
-      sameSite: "lax",
-    });
+  if (shouldUnlockBasics(lessonId)) {
+    res.cookies.set(
+      "ga-basics",
+      await createBasicsCompletionCookie(session.user.walletAddress),
+      basicsCookieOptions()
+    );
   }
 
   return res;

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { runStaticVerification } from "@/lib/genlayer/static-verify";
+import { runVerification } from "@/lib/genlayer/verify";
 import { getSpec } from "@/lib/curriculum/specs";
 import type { ProjectPath } from "@/lib/curriculum/metadata";
 
@@ -65,12 +66,28 @@ export async function POST(
   }
 
   const staticResult = runStaticVerification(code, spec.staticChecks ?? {});
-  const success = staticResult.passed;
-  const message = success
+  let success = staticResult.passed;
+  let actual: unknown;
+  let message = success
     ? `Code checklist passed with a score of ${staticResult.score}%.`
     : `Code checklist scored ${staticResult.score}%. ${
         staticResult.nextStep ?? "Review the failed checks below."
       }`;
+
+  if (staticResult.passed && spec.method) {
+    if (!contractAddress?.trim()) {
+      success = false;
+      message =
+        "Code checklist passed, but this lesson requires a deployed contract address before it can be verified.";
+    } else {
+      const deployedResult = await runVerification(contractAddress, spec);
+      success = deployedResult.success;
+      actual = deployedResult.actual;
+      message = deployedResult.success
+        ? `Code checklist passed and deployed contract returned the expected result.`
+        : `Code checklist passed, but deployed contract verification failed: ${deployedResult.message}`;
+    }
+  }
 
   if (success) {
     const { getLesson, getLessonsInGroup } = await import(
@@ -121,10 +138,11 @@ export async function POST(
     return NextResponse.json({
       success,
       message,
+      actual,
       staticResult,
       badgeAwarded,
     });
   }
 
-  return NextResponse.json({ success, message, staticResult });
+  return NextResponse.json({ success, message, actual, staticResult });
 }

@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import {
+  basicsCookieOptions,
+  createBasicsCompletionCookie,
+  shouldUnlockBasics,
+} from "@/lib/basics-gate";
 import { prisma } from "@/lib/db";
 
 export async function GET() {
@@ -21,14 +26,12 @@ export async function GET() {
 
   const res = NextResponse.json({ completed: progress.map((p) => p.lessonId) });
 
-  // Re-sync the ga-basics cookie so progress persists across sessions/cleared cookies
-  if (progress.some((p) => p.lessonId >= 3)) {
-    res.cookies.set("ga-basics", "1", {
-      httpOnly: true,
-      path: "/",
-      maxAge: 60 * 60 * 24 * 365,
-      sameSite: "lax",
-    });
+  if (progress.some((p) => shouldUnlockBasics(p.lessonId))) {
+    res.cookies.set(
+      "ga-basics",
+      await createBasicsCompletionCookie(session.user.walletAddress),
+      basicsCookieOptions()
+    );
   }
 
   return res;
