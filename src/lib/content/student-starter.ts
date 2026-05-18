@@ -17,11 +17,21 @@ function collectTaskCodeLines(content: LessonContent) {
   return text
     .split(/\r?\n/)
     .map((line) => line.trim())
-    .filter((line) =>
-      /(@gl\.|self\.|TreeMap\[|DynArray\[|u256\(|gl\.message|assert |return |json\.dumps|":\s*)/.test(
-        line
-      )
-    );
+    .filter((line) => {
+      if (!line) return false;
+      if (
+        /^(def\s+|@gl\.|self\.|assert\s+|return\s+|import\s+json\b|json\.dumps\b)/.test(
+          line
+        )
+      ) {
+        return true;
+      }
+      if (/^[A-Za-z_]\w*\s*:\s*(TreeMap|DynArray|Address|u256|str|bool)\b/.test(line)) {
+        return true;
+      }
+      if (/^"[A-Za-z0-9_ -]+"\s*:/.test(line)) return true;
+      return false;
+    });
 }
 
 function collectMethodNames(content: LessonContent, snippets: string[]) {
@@ -87,20 +97,18 @@ export function getEffectiveStaticChecks(
   content: LessonContent,
   baseChecks: StaticChecks = {}
 ): StaticChecks {
-  const snippets = collectBacktickSnippets(content);
-  const taskCodeLines = collectTaskCodeLines(content);
+  const inferredChecks = getInferredStaticChecks(content);
   const requiredMethods = unique([
     ...(baseChecks.requiredMethods ?? []),
-    ...collectMethodNames(content, snippets),
+    ...(inferredChecks.requiredMethods ?? []),
   ]);
   const requiredDecorators = unique([
     ...(baseChecks.requiredDecorators ?? []),
-    ...collectDecorators(snippets),
+    ...(inferredChecks.requiredDecorators ?? []),
   ]);
   const requiredConcepts = unique([
     ...(baseChecks.requiredConcepts ?? []),
-    ...collectConcepts(snippets),
-    ...collectConcepts(taskCodeLines),
+    ...(inferredChecks.requiredConcepts ?? []),
   ]);
 
   if (
@@ -117,6 +125,27 @@ export function getEffectiveStaticChecks(
 
   return {
     ...baseChecks,
+    requiredMethods,
+    requiredDecorators,
+    requiredConcepts,
+  };
+}
+
+function getInferredStaticChecks(content: LessonContent): StaticChecks {
+  const snippets = collectBacktickSnippets(content);
+  const taskCodeLines = collectTaskCodeLines(content);
+  const requiredMethods = unique([
+    ...collectMethodNames(content, snippets),
+  ]);
+  const requiredDecorators = unique([
+    ...collectDecorators(snippets),
+  ]);
+  const requiredConcepts = unique([
+    ...collectConcepts(snippets),
+    ...collectConcepts(taskCodeLines),
+  ]);
+
+  return {
     requiredMethods,
     requiredDecorators,
     requiredConcepts,
@@ -188,6 +217,7 @@ export function prepareLessonContentForStudent(
   content: LessonContent,
   spec: VerificationSpec | null
 ): LessonContent {
+  const inferredChecks = getInferredStaticChecks(content);
   const effectiveChecks = getEffectiveStaticChecks(
     content,
     spec?.staticChecks ?? {}
@@ -196,7 +226,13 @@ export function prepareLessonContentForStudent(
 
   if (!staticResult.passed) return content;
 
-  const starterCode = redactCompletedStarter(content.starterCode, effectiveChecks);
+  const hasInferredTargets =
+    Boolean(inferredChecks.requiredMethods?.length) ||
+    Boolean(inferredChecks.requiredConcepts?.length);
+  const starterCode = redactCompletedStarter(
+    content.starterCode,
+    hasInferredTargets ? inferredChecks : effectiveChecks
+  );
   if (starterCode === content.starterCode) return content;
 
   return {
