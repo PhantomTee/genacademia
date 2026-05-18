@@ -2,7 +2,9 @@ import { notFound } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getLesson, type ProjectPath } from "@/lib/curriculum/metadata";
+import { getSpec } from "@/lib/curriculum/specs";
 import { getContent } from "@/lib/content/loader";
+import { prepareLessonContentForStudent } from "@/lib/content/student-starter";
 import { LessonShell } from "@/components/lesson/LessonShell";
 
 export async function generateStaticParams() {
@@ -26,11 +28,17 @@ export default async function LessonPage({
 
   const projectPath = session!.user.projectPath as ProjectPath;
 
-  const [content, prevContent] = await Promise.all([
+  const [rawContent, rawPrevContent, spec, prevSpec] = await Promise.all([
     getContent(lessonId, projectPath),
     lessonId > 1 ? getContent(lessonId - 1, projectPath).catch(() => null) : Promise.resolve(null),
+    getSpec(lessonId, projectPath),
+    lessonId > 1 ? getSpec(lessonId - 1, projectPath).catch(() => null) : Promise.resolve(null),
   ]);
 
+  const content = prepareLessonContentForStudent(rawContent, spec);
+  const prevContent = rawPrevContent
+    ? prepareLessonContentForStudent(rawPrevContent, prevSpec)
+    : null;
   const prevCode = prevContent?.expectedCode ?? prevContent?.starterCode;
 
   return <LessonShell lesson={lesson} content={content} prevCode={prevCode} />;

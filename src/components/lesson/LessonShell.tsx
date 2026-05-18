@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { Group, Panel, Separator } from "react-resizable-panels";
 import { CodeEditor } from "./CodeEditor";
@@ -26,10 +26,21 @@ interface Props {
 export function LessonShell({ lesson, content, prevCode }: Props) {
   useSession();
   const storageKey = `draft-${lesson.id}-${content.projectPath}`;
+  const isSolvedDraft = useCallback(
+    (draft?: string | null) =>
+      Boolean(
+        content.expectedCode &&
+          draft &&
+          draft.trim() === content.expectedCode.trim()
+      ),
+    [content.expectedCode]
+  );
   const [code, setCode] = useState(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem(`draft-${lesson.id}-${content.projectPath}`);
-      if (saved && saved !== content.starterCode) return saved;
+      if (saved && saved !== content.starterCode && !isSolvedDraft(saved)) {
+        return saved;
+      }
     }
     return content.starterCode;
   });
@@ -55,7 +66,7 @@ export function LessonShell({ lesson, content, prevCode }: Props) {
       const res = await fetch(`/api/progress/${lesson.id}`);
       const data = await res.json();
       if (data.progress) {
-        if (data.progress.editorDraft) {
+        if (data.progress.editorDraft && !isSolvedDraft(data.progress.editorDraft)) {
           setCode(data.progress.editorDraft);
           localStorage.setItem(storageKey, data.progress.editorDraft);
         }
@@ -67,7 +78,7 @@ export function LessonShell({ lesson, content, prevCode }: Props) {
       setProgressLoaded(true);
     }
     loadProgress();
-  }, [lesson.id, storageKey]);
+  }, [lesson.id, storageKey, isSolvedDraft]);
 
   const TABS: { id: Tab; label: string; badge?: number }[] = [
     { id: "deploy", label: "Deploy" },

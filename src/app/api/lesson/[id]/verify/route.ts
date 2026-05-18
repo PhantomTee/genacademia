@@ -5,6 +5,8 @@ import { prisma } from "@/lib/db";
 import { runStaticVerification } from "@/lib/genlayer/static-verify";
 import { runVerification } from "@/lib/genlayer/verify";
 import { getSpec } from "@/lib/curriculum/specs";
+import { getContent } from "@/lib/content/loader";
+import { getEffectiveStaticChecks } from "@/lib/content/student-starter";
 import type { ProjectPath } from "@/lib/curriculum/metadata";
 
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
@@ -53,7 +55,10 @@ export async function POST(
   };
   const projectPath = session.user.projectPath as ProjectPath;
 
-  const spec = await getSpec(lessonId, projectPath);
+  const [spec, content] = await Promise.all([
+    getSpec(lessonId, projectPath),
+    getContent(lessonId, projectPath),
+  ]);
   if (!spec) {
     return NextResponse.json({ error: "No spec for this lesson" }, { status: 404 });
   }
@@ -65,7 +70,10 @@ export async function POST(
     });
   }
 
-  const staticResult = runStaticVerification(code, spec.staticChecks ?? {});
+  const staticResult = runStaticVerification(
+    code,
+    getEffectiveStaticChecks(content, spec.staticChecks ?? {})
+  );
   let success = staticResult.passed;
   let actual: unknown;
   let message = success
