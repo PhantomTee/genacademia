@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { AsciiHero } from "@/components/AsciiHero";
 import { StartLearningButton } from "@/components/StartLearningButton";
 
