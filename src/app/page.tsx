@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AsciiHero } from "@/components/AsciiHero";
+import { StartLearningButton } from "@/components/StartLearningButton";
 
 export default function LandingPage() {
   return (
@@ -24,12 +25,7 @@ export default function LandingPage() {
               </h1>
 
               <div className="flex flex-col sm:flex-row items-stretch sm:items-start gap-2 sm:gap-0 mt-8">
-                <Link
-                  href="/dashboard"
-                  className="text-center px-8 py-4 text-sm font-bold uppercase tracking-widest border border-ink dark:border-cream-200 bg-ink dark:bg-cream-200 text-cream-200 dark:text-ink hover:opacity-80 transition-opacity"
-                >
-                  Start Learning
-                </Link>
+                <StartLearningButton className="text-center px-8 py-4 text-sm font-bold uppercase tracking-widest border border-ink dark:border-cream-200 bg-ink dark:bg-cream-200 text-cream-200 dark:text-ink hover:opacity-80 transition-opacity disabled:opacity-50" />
                 <a
                   href="https://docs.genlayer.com"
                   target="_blank"
@@ -128,12 +124,7 @@ export default function LandingPage() {
             <br />
             build?
           </h2>
-          <Link
-            href="/dashboard"
-            className="w-full sm:w-auto text-center px-8 py-4 text-sm font-bold uppercase tracking-widest border border-cream-200 dark:border-ink bg-cream-200 dark:bg-ink text-ink dark:text-cream-200 hover:opacity-80 transition-opacity flex-shrink-0"
-          >
-            Start for Free →
-          </Link>
+          <StartLearningButton className="w-full sm:w-auto text-center px-8 py-4 text-sm font-bold uppercase tracking-widest border border-cream-200 dark:border-ink bg-cream-200 dark:bg-ink text-ink dark:text-cream-200 hover:opacity-80 transition-opacity flex-shrink-0 disabled:opacity-50" />
         </div>
       </section>
     </>
