@@ -9,7 +9,7 @@ import { studionetChain } from "@/lib/wagmi/chains";
 
 const isAllowedChain = (id: number | undefined): boolean => id === studionetChain.id;
 
-type Step = "idle" | "connecting" | "switching" | "signing" | "redirecting";
+type Step = "idle" | "picking" | "connecting" | "switching" | "signing" | "redirecting";
 
 export function StartLearningButton({ className }: { className?: string }) {
   const { address, isConnected, chainId } = useAccount();
@@ -23,7 +23,7 @@ export function StartLearningButton({ className }: { className?: string }) {
   const [step, setStep] = useState<Step>("idle");
   const [error, setError] = useState<string | null>(null);
 
-  // Once wallet connects, auto-advance to sign-in (only when triggered by this button)
+  // Once wallet connects, auto-advance
   useEffect(() => {
     if (step === "connecting" && isConnected && address && chainId) {
       if (!isAllowedChain(chainId)) {
@@ -39,7 +39,7 @@ export function StartLearningButton({ className }: { className?: string }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isConnected, address, chainId, step]);
 
-  // Once chain switches, auto-advance to sign-in
+  // Once chain switches, advance to sign-in
   useEffect(() => {
     if (step === "switching" && isConnected && address && chainId && isAllowedChain(chainId)) {
       doSignIn(address, chainId);
@@ -59,35 +59,11 @@ export function StartLearningButton({ className }: { className?: string }) {
     }
   }
 
-  async function handleClick() {
-    setError(null);
-
-    // Already signed in — go straight to dashboard
-    if (session) {
-      router.push("/dashboard");
-      return;
-    }
-
-    // Wallet connected + correct chain — just sign in
-    if (isConnected && address && chainId && isAllowedChain(chainId)) {
-      doSignIn(address, chainId);
-      return;
-    }
-
-    // Wallet connected + wrong chain — switch first
-    if (isConnected && chainId && !isAllowedChain(chainId)) {
-      setStep("switching");
-      switchChain(
-        { chainId: studionetChain.id },
-        { onError: () => { setError("Failed to switch network"); setStep("idle"); } }
-      );
-      return;
-    }
-
-    // Not connected — connect wallet (useEffect will auto-advance)
-    const connector = connectors[0];
+  function triggerConnect(connectorId: string) {
+    const connector = connectors.find((c) => c.id === connectorId);
     if (!connector) {
-      setError("No EVM wallet detected. Please install MetaMask or another wallet.");
+      setError("Wallet not available");
+      setStep("idle");
       return;
     }
     setStep("connecting");
@@ -103,11 +79,75 @@ export function StartLearningButton({ className }: { className?: string }) {
     );
   }
 
+  function handleClick() {
+    setError(null);
+
+    if (session) {
+      router.push("/dashboard");
+      return;
+    }
+
+    if (isConnected && address && chainId && isAllowedChain(chainId)) {
+      doSignIn(address, chainId);
+      return;
+    }
+
+    if (isConnected && chainId && !isAllowedChain(chainId)) {
+      setStep("switching");
+      switchChain(
+        { chainId: studionetChain.id },
+        { onError: () => { setError("Wrong network — switch to GenLayer Studionet manually"); setStep("idle"); } }
+      );
+      return;
+    }
+
+    if (connectors.length === 0) {
+      setError("No EVM wallet detected. Please install MetaMask or another wallet.");
+      return;
+    }
+
+    // More than one connector available — show picker
+    if (connectors.length > 1) {
+      setStep("picking");
+      return;
+    }
+
+    // Only one connector — connect directly
+    triggerConnect(connectors[0].id);
+  }
+
+  if (step === "picking") {
+    return (
+      <div className="flex flex-col items-start gap-2">
+        <span className="text-xs font-bold uppercase tracking-widest text-ink/50 dark:text-cream-200/50">
+          Choose wallet
+        </span>
+        <div className="flex flex-col gap-1 w-full">
+          {connectors.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => triggerConnect(c.id)}
+              className={className + " w-full text-left"}
+            >
+              {c.name}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={() => setStep("idle")}
+          className="text-xs text-ink/40 dark:text-cream-200/40 hover:text-ink dark:hover:text-cream-200 underline"
+        >
+          Cancel
+        </button>
+      </div>
+    );
+  }
+
   const label =
-    step === "connecting" ? "Connecting wallet..." :
-    step === "switching"  ? "Switching network..." :
-    step === "signing"    ? "Sign the message..." :
-    step === "redirecting"? "Loading..." :
+    step === "connecting"  ? "Connecting wallet..." :
+    step === "switching"   ? "Switching network..." :
+    step === "signing"     ? "Sign the message..." :
+    step === "redirecting" ? "Loading..." :
     "Start Learning";
 
   return (
