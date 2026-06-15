@@ -30,7 +30,7 @@ export function StartLearningButton({ className }: { className?: string }) {
         setStep("switching");
         switchChain(
           { chainId: studionetChain.id },
-          { onError: () => { setError("Failed to switch network"); setStep("idle"); } }
+          { onError: () => { setError("Wrong network — please switch to GenLayer Studionet manually"); setStep("idle"); } }
         );
       } else {
         doSignIn(address, chainId);
@@ -85,8 +85,22 @@ export function StartLearningButton({ className }: { className?: string }) {
     }
 
     // Not connected — connect wallet (useEffect will auto-advance)
+    const connector = connectors[0];
+    if (!connector) {
+      setError("No EVM wallet detected. Please install MetaMask or another wallet.");
+      return;
+    }
     setStep("connecting");
-    connect({ connector: connectors[0] });
+    connect(
+      { connector },
+      {
+        onError: (err) => {
+          const msg = err?.message ?? "";
+          setError(msg.toLowerCase().includes("reject") ? "Connection cancelled" : "Failed to connect wallet");
+          setStep("idle");
+        },
+      }
+    );
   }
 
   const label =
