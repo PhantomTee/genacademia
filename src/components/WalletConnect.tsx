@@ -45,8 +45,8 @@ export function WalletConnect() {
 
   async function handleSignIn() {
     if (!address || !chainId) return;
-    const ok = await signInWithEthereum(address, chainId);
-    if (ok) router.push("/dashboard");
+    const result = await signInWithEthereum(address, chainId);
+    if (result.ok) router.push("/dashboard");
   }
 
   function handleDisconnect() {

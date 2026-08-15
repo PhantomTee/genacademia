@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useAccount, useConnect, useConnectors, useSwitchChain } from "wagmi";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useSiweAuth } from "@/hooks/useSiweAuth";
+import { SIGN_IN_ERRORS, useSiweAuth } from "@/hooks/useSiweAuth";
 import { studionetChain } from "@/lib/wagmi/chains";
 
 const isAllowedChain = (id: number | undefined): boolean => id === studionetChain.id;
@@ -49,12 +49,12 @@ export function StartLearningButton({ className }: { className?: string }) {
 
   async function doSignIn(addr: string, chain: number) {
     setStep("signing");
-    const ok = await signInWithEthereum(addr, chain);
-    if (ok) {
+    const result = await signInWithEthereum(addr, chain);
+    if (result.ok) {
       setStep("redirecting");
       router.push("/dashboard");
     } else {
-      setError("Signature rejected — try again");
+      setError(SIGN_IN_ERRORS[result.reason]);
       setStep("idle");
     }
   }
