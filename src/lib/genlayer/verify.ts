@@ -14,6 +14,8 @@ export interface VerificationSpec {
   expectedShape?: "exact" | "nonEmpty" | "custom";
   expected?: unknown;
   customCheck?: (actual: unknown) => boolean;
+  /** Shown when customCheck fails, so the student knows what to do next. */
+  customMessage?: string;
   staticChecks?: StaticChecks;
 }
 
@@ -81,7 +83,7 @@ export async function runVerification(
     return {
       success: ok,
       actual,
-      message: ok ? "Verified." : "Custom check failed.",
+      message: ok ? "Verified." : spec.customMessage ?? "Custom check failed.",
     };
   }
 
