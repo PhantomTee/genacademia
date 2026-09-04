@@ -25,11 +25,23 @@ class TrustLance(gl.Contract):
     owner: Address
     platform_name: str
     platform_description: str
+    job_count: u256
+    job_titles: TreeMap[str, str]
+    job_descriptions: TreeMap[str, str]
+    job_clients: TreeMap[str, Address]
+    job_budgets: TreeMap[str, u256]
+    job_statuses: TreeMap[str, str]
+    job_freelancers: TreeMap[str, Address]
+    job_ids: DynArray[str]
+    job_escrow: TreeMap[str, u256]
+    job_deliveries: TreeMap[str, str]
+    freelancer_claimed: TreeMap[str, bool]
 
     def __init__(self) -> None:
         self.owner = gl.message.sender_address
         self.platform_name = "TrustLance"
         self.platform_description = "A GenLayer freelance escrow platform."
+        self.job_count = u256(0)
 
     @gl.public.view
     def get_platform_name(self) -> str:
@@ -53,19 +65,7 @@ class TrustLance(gl.Contract):
         assert len(new_description) > 0, "Description cannot be empty"
         self.platform_description = new_description
 
-    job_count: u256
-    job_titles: TreeMap[str, str]
-    job_descriptions: TreeMap[str, str]
-    job_clients: TreeMap[str, Address]
-    job_budgets: TreeMap[str, u256]
-    job_statuses: TreeMap[str, str]
-    job_freelancers: TreeMap[str, Address]
 
-    def __init__(self) -> None:
-        self.owner = gl.message.sender_address
-        self.platform_name = "TrustLance"
-        self.platform_description = "A GenLayer freelance escrow platform."
-        self.job_count = u256(0)
 
     @gl.public.write
     def create_job(self, title: str, description: str, budget: u256) -> str:
@@ -79,10 +79,10 @@ class TrustLance(gl.Contract):
         self.job_clients[job_id] = gl.message.sender_address
         self.job_budgets[job_id] = budget
         self.job_statuses[job_id] = "open"
+        self.job_ids.append(job_id)
         self.job_count = self.job_count + u256(1)
         return job_id
 
-    job_ids: DynArray[str]
 
     @gl.public.view
     def get_job_json(self, job_id: str) -> str:
@@ -118,9 +118,6 @@ class TrustLance(gl.Contract):
         assert self.job_statuses[job_id] == "open", "Only open jobs can be closed"
         self.job_statuses[job_id] = "closed"
 
-    job_escrow: TreeMap[str, u256]
-    job_deliveries: TreeMap[str, str]
-    freelancer_claimed: TreeMap[str, bool]
 
     @gl.public.write.payable
     def fund_job(self, job_id: str) -> None:
@@ -212,7 +209,7 @@ class TrustLance(gl.Contract):
   task: `Deploy the final contract. Confirm it passes all checks: identity, job creation, job listing, escrow funding, delivery, confirmation, AI dispute review, frontend mapping, and test checklist.`,
   hints: [
     "All 30 lessons culminate in this contract — review each section.",
-    "Make sure the dependency header uses the real hash (not :test).",
+    "Make sure the dependency header uses the real py-genlayer hash rather than the :test build.",
     "Deploy on Studionet and call get_platform_name() to verify.",
   ],
 };
