@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "audit:starters": "node scripts/audit-starters.mjs"
+    "audit:starters": "node scripts/audit-starters.mjs",
+    "test": "node --test \"tests/**/*.test.mjs\"",
+    "audit:methods": "node scripts/scan-phantom-methods.mjs"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
@@ -43,8 +45,10 @@
     "@types/react-dom": "^18",
     "eslint": "^8",
     "eslint-config-next": "14.2.35",
+    "jiti": "^1.21.7",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
+    "tsconfig-paths": "^4.2.0",
     "typescript": "^5"
   }
 }
