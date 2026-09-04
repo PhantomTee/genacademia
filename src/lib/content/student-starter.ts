@@ -34,30 +34,58 @@ function collectTaskCodeLines(content: LessonContent) {
     });
 }
 
+// Names that read as calls in prose but can never be a contract method:
+// Python builtins, and the library calls the lessons tell students to use.
+const NON_METHOD_CALLS = new Set([
+  "str",
+  "u256",
+  "len",
+  "json",
+  "append",
+  "get",
+  "return",
+  "assert",
+  "int",
+  "float",
+  "bool",
+  "list",
+  "dict",
+  "set",
+  "print",
+  "range",
+  "sorted",
+  "isinstance",
+  "enumerate",
+  "sum",
+  "min",
+  "max",
+  "abs",
+  "hash",
+  "type",
+]);
+
 function collectMethodNames(content: LessonContent, snippets: string[]) {
   const text = [content.task, ...content.hints, ...snippets].join("\n");
   const names: string[] = [];
 
+  // An explicit `def name(` in the prose is an unambiguous requirement.
   for (const match of text.matchAll(/\bdef\s+([A-Za-z_]\w*)\s*\(/g)) {
     names.push(match[1]);
   }
-  for (const match of text.matchAll(/\b([A-Za-z_]\w*)\s*\(/g)) {
-    const name = match[1];
-    if (
-      ![
-        "str",
-        "u256",
-        "len",
-        "json",
-        "append",
-        "get",
-        "return",
-        "assert",
-      ].includes(name)
-    ) {
-      names.push(name);
+
+  // Bare calls only count inside backticked code. Scanning free prose turned
+  // any English word before a parenthesis into a required method, so a hint
+  // reading "the real hash (not :test)" demanded a `def hash(`. Attribute
+  // calls are skipped as well: json.dumps and gl.vm.run_nondet_unsafe belong
+  // to the library, not to the student's contract.
+  for (const snippet of snippets) {
+    for (const match of snippet.matchAll(/(^|[^\w.])([a-z][a-z0-9_]*)\s*\(/g)) {
+      const name = match[2];
+      if (!NON_METHOD_CALLS.has(name)) names.push(name);
     }
   }
+
+  // Snake_case names the starter already defines are real methods.
   for (const match of text.matchAll(/\b([a-z][A-Za-z0-9_]*_[A-Za-z0-9_]+)\b/g)) {
     const name = match[1];
     if (new RegExp(`\\bdef\\s+${name}\\s*\\(`).test(content.starterCode)) {
