@@ -14,6 +14,15 @@ import json
 from genlayer import *
 
 
+@gl.evm.contract_interface
+class _Recipient:
+    class View:
+        pass
+
+    class Write:
+        pass
+
+
 class PredictX(gl.Contract):
     owner: Address
     platform_name: str
@@ -247,12 +256,24 @@ class PredictX(gl.Contract):
 
         if winning_outcome == "A":
             assert claim_key in self.user_stakes_a, "No winning stake found"
+            stake = self.user_stakes_a[claim_key]
+            winning_total = self.market_total_a[market_id]
         elif winning_outcome == "B":
             assert claim_key in self.user_stakes_b, "No winning stake found"
+            stake = self.user_stakes_b[claim_key]
+            winning_total = self.market_total_b[market_id]
         else:
             assert False, "Invalid resolved outcome"
 
+        assert stake > u256(0), "No winning stake found"
+        assert winning_total > u256(0), "No winning stakes to pay out"
+
+        total_pool = self.market_total_a[market_id] + self.market_total_b[market_id]
+        payout = stake * total_pool // winning_total
+
         self.user_claimed[claim_key] = True
+
+        _Recipient(gl.message.sender_address).emit_transfer(value=payout)
 
     @gl.public.view
     def get_frontend_actions_json(self) -> str:
@@ -276,7 +297,7 @@ class PredictX(gl.Contract):
             "Reject staking below minimum",
             "Close the market",
             "Resolve the market with AI evidence",
-            "Allow winning users to claim",
+            "Allow winning users to claim their share of the pool",
             "Reject duplicate claims"
         ], sort_keys=True)
 `,
@@ -291,7 +312,7 @@ Before marking the capstone complete, confirm the contract can:
 - close a market before resolution
 - resolve a closed market with AI using gl.vm.run_nondet_unsafe
 - store the winning outcome and resolution reason
-- allow winning users to claim once and reject duplicate claims
+- pay winning users their proportional share of the pool once, and reject duplicate claims
 - expose frontend action mappings and a test checklist
 
 After deployment, call get_platform_name() and at least one JSON view to prove the contract is reachable.`,
