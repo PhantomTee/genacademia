@@ -8,21 +8,36 @@ const { getSpec } = jiti("../src/lib/curriculum/specs/index.ts");
 const { getEffectiveStaticChecks } = jiti("../src/lib/content/student-starter.ts");
 
 const PATHS = ["PREDICTION_MARKET","FREELANCE_ESCROW","DAO","DEVELOPER_REPUTATION","INSURANCE"];
+const NL = String.fromCharCode(10);
 
-// A lesson's solution is the NEXT lesson's starter; lesson 30 is its own.
-// A required method absent from BOTH is one no student can ever satisfy.
-const bad = [];
+// A lesson may legitimately require a method its own starter lacks - that is
+// the method the student is there to write. What is never legitimate is
+// requiring a name no contract on the path ever defines, which is what
+// happens when prose is parsed as a call ("the real hash (not :test)").
+const phantom = [];
 for (const p of PATHS) {
+  const defined = new Set();
+  const lessons = [];
   for (let id = 1; id <= 30; id++) {
     const c = await getContent(id, p);
-    const solution = id < 30 ? (await getContent(id + 1, p)).starterCode : c.starterCode;
+    lessons.push(c);
+    // Nested defs count too: the AI lessons require an inner `def run():`.
+    for (const m of c.starterCode.matchAll(/^\s+def\s+([A-Za-z_]\w*)\s*\(/gm)) {
+      defined.add(m[1]);
+    }
+  }
+
+  for (let id = 1; id <= 30; id++) {
+    const c = lessons[id - 1];
     const spec = await getSpec(id, p);
     const checks = getEffectiveStaticChecks(c, spec?.staticChecks ?? {});
-    const missing = (checks.requiredMethods ?? []).filter(
-      (m) => !solution.includes("def " + m + "(") && !c.starterCode.includes("def " + m + "(")
-    );
-    if (missing.length) bad.push(String(id).padStart(2,"0") + "-" + p + ": " + missing.join(", "));
+    const bogus = (checks.requiredMethods ?? []).filter((m) => !defined.has(m));
+    if (bogus.length) {
+      phantom.push(String(id).padStart(2, "0") + "-" + p + ": " + bogus.join(", "));
+    }
   }
 }
-console.log("lessons requiring methods no solution defines: " + bad.length + "/150");
-console.log(bad.join(String.fromCharCode(10)));
+
+console.log("lessons requiring a method no contract on the path defines: " + phantom.length + "/150");
+if (phantom.length) console.log(phantom.join(NL));
+process.exit(phantom.length > 0 ? 1 : 0);
