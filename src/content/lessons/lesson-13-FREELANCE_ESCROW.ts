@@ -17,11 +17,20 @@ class TrustLance(gl.Contract):
     owner: Address
     platform_name: str
     platform_description: str
+    job_count: u256
+    job_titles: TreeMap[str, str]
+    job_descriptions: TreeMap[str, str]
+    job_clients: TreeMap[str, Address]
+    job_budgets: TreeMap[str, u256]
+    job_statuses: TreeMap[str, str]
+    job_freelancers: TreeMap[str, Address]
+    job_ids: DynArray[str]
 
     def __init__(self) -> None:
         self.owner = gl.message.sender_address
         self.platform_name = "TrustLance"
         self.platform_description = "A GenLayer freelance escrow platform."
+        self.job_count = u256(0)
 
     @gl.public.view
     def get_platform_name(self) -> str:
@@ -45,19 +54,7 @@ class TrustLance(gl.Contract):
         assert len(new_description) > 0, "Description cannot be empty"
         self.platform_description = new_description
 
-    job_count: u256
-    job_titles: TreeMap[str, str]
-    job_descriptions: TreeMap[str, str]
-    job_clients: TreeMap[str, Address]
-    job_budgets: TreeMap[str, u256]
-    job_statuses: TreeMap[str, str]
-    job_freelancers: TreeMap[str, Address]
 
-    def __init__(self) -> None:
-        self.owner = gl.message.sender_address
-        self.platform_name = "TrustLance"
-        self.platform_description = "A GenLayer freelance escrow platform."
-        self.job_count = u256(0)
 
     @gl.public.write
     def create_job(self, title: str, description: str, budget: u256) -> str:
@@ -74,7 +71,6 @@ class TrustLance(gl.Contract):
         self.job_count = self.job_count + u256(1)
         return job_id
 
-    job_ids: DynArray[str]
 
     @gl.public.view
     def get_job_json(self, job_id: str) -> str:
@@ -88,14 +84,6 @@ class TrustLance(gl.Contract):
             "status": self.job_statuses[job_id],
         }, sort_keys=True)
 
-
-
-    job_ids: DynArray[str]
-
-    @gl.public.view
-    def get_job_json(self, job_id: str) -> str:
-        assert job_id in self.job_titles, "Job not found"
-        return json.dumps({"id": job_id, "title": self.job_titles[job_id], "budget": str(self.job_budgets[job_id]), "status": self.job_statuses[job_id]}, sort_keys=True)
 `,
   task: `Add \`get_open_jobs_json(self) -> str\` that loops \`job_ids\`, filters by \`job_statuses[job_id] == "open"\`, and returns a JSON array.`,
   hints: [

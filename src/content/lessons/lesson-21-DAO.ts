@@ -17,11 +17,23 @@ class GovMind(gl.Contract):
     owner: Address
     dao_name: str
     dao_description: str
+    proposal_count: u256
+    proposal_titles: TreeMap[str, str]
+    proposal_descriptions: TreeMap[str, str]
+    proposal_proposers: TreeMap[str, Address]
+    proposal_statuses: TreeMap[str, str]
+    members: TreeMap[str, bool]
+    proposal_ids: DynArray[str]
+    for_votes: TreeMap[str, u256]
+    against_votes: TreeMap[str, u256]
+    has_voted: TreeMap[str, bool]
 
     def __init__(self) -> None:
         self.owner = gl.message.sender_address
         self.dao_name = "GovMind"
         self.dao_description = "An AI-governed decentralised autonomous organisation."
+        self.proposal_count = u256(0)
+        self.members[self.owner.as_hex] = True
 
     @gl.public.view
     def get_dao_name(self) -> str:
@@ -45,19 +57,7 @@ class GovMind(gl.Contract):
         assert len(new_description) > 0, "Description cannot be empty"
         self.dao_description = new_description
 
-    proposal_count: u256
-    proposal_titles: TreeMap[str, str]
-    proposal_descriptions: TreeMap[str, str]
-    proposal_proposers: TreeMap[str, Address]
-    proposal_statuses: TreeMap[str, str]
-    members: TreeMap[str, bool]
 
-    def __init__(self) -> None:
-        self.owner = gl.message.sender_address
-        self.dao_name = "GovMind"
-        self.dao_description = "An AI-governed decentralised autonomous organisation."
-        self.proposal_count = u256(0)
-        self.members[self.owner.as_hex] = True
 
     @gl.public.write
     def create_proposal(self, title: str, description: str) -> str:
@@ -72,7 +72,6 @@ class GovMind(gl.Contract):
         self.proposal_count = self.proposal_count + u256(1)
         return proposal_id
 
-    proposal_ids: DynArray[str]
 
     @gl.public.view
     def get_proposal_json(self, proposal_id: str) -> str:
@@ -107,9 +106,6 @@ class GovMind(gl.Contract):
         assert self.proposal_statuses[proposal_id] == "open", "Only open proposals can be closed"
         self.proposal_statuses[proposal_id] = "closed"
 
-    for_votes: TreeMap[str, u256]
-    against_votes: TreeMap[str, u256]
-    has_voted: TreeMap[str, bool]
 
     @gl.public.write
     def vote(self, proposal_id: str, support: bool) -> None:

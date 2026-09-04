@@ -22,6 +22,7 @@ class GovMind(gl.Contract):
         self.owner = gl.message.sender_address
         self.dao_name = "GovMind"
         self.dao_description = "An AI-governed decentralised autonomous organisation."
+
 `,
   task: `Add a persistent \`dao_description: str\` field and initialize it with "An AI-governed decentralised autonomous organisation."`,
   hints: [

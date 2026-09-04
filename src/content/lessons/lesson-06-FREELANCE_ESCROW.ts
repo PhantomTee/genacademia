@@ -17,11 +17,13 @@ class TrustLance(gl.Contract):
     owner: Address
     platform_name: str
     platform_description: str
+    job_count: u256
 
     def __init__(self) -> None:
         self.owner = gl.message.sender_address
         self.platform_name = "TrustLance"
         self.platform_description = "A GenLayer freelance escrow platform."
+        self.job_count = u256(0)
 
     @gl.public.view
     def get_platform_name(self) -> str:
@@ -45,13 +47,7 @@ class TrustLance(gl.Contract):
         assert len(new_description) > 0, "Description cannot be empty"
         self.platform_description = new_description
 
-    job_count: u256
 
-    def __init__(self) -> None:
-        self.owner = gl.message.sender_address
-        self.platform_name = "TrustLance"
-        self.platform_description = "A GenLayer freelance escrow platform."
-        self.job_count = u256(0)
 `,
   task: `Initialize \`job_count\` to \`u256(0)\` in the constructor. Add a \`@gl.public.view\` method \`get_job_count()\` that returns it as a string.`,
   hints: [

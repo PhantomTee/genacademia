@@ -27,6 +27,7 @@ class TrustLance(gl.Contract):
     def __init__(self) -> None:
         self.owner = gl.message.sender_address
         self.platform_name = "TrustLance"
+
 `,
   task: `Add a \`platform_description: str\` field and initialize it in the constructor with "A GenLayer freelance escrow platform."`,
   hints: [

@@ -17,11 +17,13 @@ class CodeVault(gl.Contract):
     owner: Address
     platform_name: str
     platform_description: str
+    listing_count: u256
 
     def __init__(self) -> None:
         self.owner = gl.message.sender_address
         self.platform_name = "CodeVault"
         self.platform_description = "A GenLayer private code marketplace."
+        self.listing_count = u256(0)
 
     @gl.public.view
     def get_platform_name(self) -> str:
@@ -45,13 +47,7 @@ class CodeVault(gl.Contract):
         assert len(new_description) > 0, "Description cannot be empty"
         self.platform_description = new_description
 
-    listing_count: u256
 
-    def __init__(self) -> None:
-        self.owner = gl.message.sender_address
-        self.platform_name = "CodeVault"
-        self.platform_description = "A GenLayer private code marketplace."
-        self.listing_count = u256(0)
 `,
   task: `Add \`listing_count: u256\` and initialize to \`u256(0)\`. Add \`get_listing_count()\` as a view returning \`str(self.listing_count)\`.`,
   hints: [

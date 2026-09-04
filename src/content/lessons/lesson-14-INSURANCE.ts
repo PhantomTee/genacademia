@@ -23,7 +23,6 @@ class CaseWise(gl.Contract):
     owner: Address
     court_name: str
     court_rules: str
-
     case_titles: TreeMap[str, str]
     case_claims: TreeMap[str, str]
     case_claimants: TreeMap[str, Address]

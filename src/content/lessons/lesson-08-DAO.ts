@@ -17,11 +17,17 @@ class GovMind(gl.Contract):
     owner: Address
     dao_name: str
     dao_description: str
+    proposal_count: u256
+    members: TreeMap[str, bool]
+    voting_power: TreeMap[str, u256]
 
     def __init__(self) -> None:
         self.owner = gl.message.sender_address
         self.dao_name = "GovMind"
         self.dao_description = "An AI-governed decentralised autonomous organisation."
+        self.proposal_count = u256(0)
+        self.members[self.owner.as_hex] = True
+        self.voting_power[self.owner.as_hex] = u256(1)
 
     @gl.public.view
     def get_dao_name(self) -> str:
@@ -45,17 +51,7 @@ class GovMind(gl.Contract):
         assert len(new_description) > 0, "Description cannot be empty"
         self.dao_description = new_description
 
-    proposal_count: u256
-    members: TreeMap[str, bool]
-    voting_power: TreeMap[str, u256]
 
-    def __init__(self) -> None:
-        self.owner = gl.message.sender_address
-        self.dao_name = "GovMind"
-        self.dao_description = "An AI-governed decentralised autonomous organisation."
-        self.proposal_count = u256(0)
-        self.members[self.owner.as_hex] = True
-        self.voting_power[self.owner.as_hex] = u256(1)
 `,
   task: `Add \`voting_power: TreeMap[str, u256]\` at class level. Give the owner \`u256(1)\` in \`__init__\`. Add \`set_voting_power(self, address_hex: str, power: u256)\` (owner only).`,
   hints: [

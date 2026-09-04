@@ -17,11 +17,20 @@ class CodeVault(gl.Contract):
     owner: Address
     platform_name: str
     platform_description: str
+    listing_count: u256
+    listing_titles: TreeMap[str, str]
+    listing_descriptions: TreeMap[str, str]
+    listing_sellers: TreeMap[str, Address]
+    listing_prices: TreeMap[str, u256]
+    listing_statuses: TreeMap[str, str]
+    listing_source_hashes: TreeMap[str, str]
+    listing_previews: TreeMap[str, str]
 
     def __init__(self) -> None:
         self.owner = gl.message.sender_address
         self.platform_name = "CodeVault"
         self.platform_description = "A GenLayer private code marketplace."
+        self.listing_count = u256(0)
 
     @gl.public.view
     def get_platform_name(self) -> str:
@@ -45,20 +54,7 @@ class CodeVault(gl.Contract):
         assert len(new_description) > 0, "Description cannot be empty"
         self.platform_description = new_description
 
-    listing_count: u256
-    listing_titles: TreeMap[str, str]
-    listing_descriptions: TreeMap[str, str]
-    listing_sellers: TreeMap[str, Address]
-    listing_prices: TreeMap[str, u256]
-    listing_statuses: TreeMap[str, str]
-    listing_source_hashes: TreeMap[str, str]
-    listing_previews: TreeMap[str, str]
 
-    def __init__(self) -> None:
-        self.owner = gl.message.sender_address
-        self.platform_name = "CodeVault"
-        self.platform_description = "A GenLayer private code marketplace."
-        self.listing_count = u256(0)
 `,
   task: `Add all 8 listing fields at class level. Update \`create_listing\` to store title, description, source_hash, preview, and status ("active").`,
   hints: [

@@ -20,11 +20,19 @@ class TrustLance(gl.Contract):
     owner: Address
     platform_name: str
     platform_description: str
+    job_count: u256
+    job_titles: TreeMap[str, str]
+    job_descriptions: TreeMap[str, str]
+    job_clients: TreeMap[str, Address]
+    job_budgets: TreeMap[str, u256]
+    job_statuses: TreeMap[str, str]
+    job_freelancers: TreeMap[str, Address]
 
     def __init__(self) -> None:
         self.owner = gl.message.sender_address
         self.platform_name = "TrustLance"
         self.platform_description = "A GenLayer freelance escrow platform."
+        self.job_count = u256(0)
 
     @gl.public.view
     def get_platform_name(self) -> str:
@@ -48,19 +56,7 @@ class TrustLance(gl.Contract):
         assert len(new_description) > 0, "Description cannot be empty"
         self.platform_description = new_description
 
-    job_count: u256
-    job_titles: TreeMap[str, str]
-    job_descriptions: TreeMap[str, str]
-    job_clients: TreeMap[str, Address]
-    job_budgets: TreeMap[str, u256]
-    job_statuses: TreeMap[str, str]
-    job_freelancers: TreeMap[str, Address]
 
-    def __init__(self) -> None:
-        self.owner = gl.message.sender_address
-        self.platform_name = "TrustLance"
-        self.platform_description = "A GenLayer freelance escrow platform."
-        self.job_count = u256(0)
 `,
   task: `Complete \`create_job(self, title: str, description: str, budget: u256) -> str\` with: 3 input validations (non-empty title, non-empty description, budget > 0), all field assignments, counter increment, return the job ID.`,
   hints: [

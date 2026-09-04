@@ -22,6 +22,7 @@ class CodeVault(gl.Contract):
         self.owner = gl.message.sender_address
         self.platform_name = "CodeVault"
         self.platform_description = "A GenLayer private code marketplace."
+
 `,
   task: `Add \`platform_description: str\` and initialize it with "A GenLayer private code marketplace."`,
   hints: [

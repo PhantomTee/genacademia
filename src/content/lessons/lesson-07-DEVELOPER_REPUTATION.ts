@@ -17,11 +17,14 @@ class CodeVault(gl.Contract):
     owner: Address
     platform_name: str
     platform_description: str
+    listing_count: u256
+    listing_sellers: TreeMap[str, Address]
 
     def __init__(self) -> None:
         self.owner = gl.message.sender_address
         self.platform_name = "CodeVault"
         self.platform_description = "A GenLayer private code marketplace."
+        self.listing_count = u256(0)
 
     @gl.public.view
     def get_platform_name(self) -> str:
@@ -45,14 +48,7 @@ class CodeVault(gl.Contract):
         assert len(new_description) > 0, "Description cannot be empty"
         self.platform_description = new_description
 
-    listing_count: u256
-    listing_sellers: TreeMap[str, Address]
 
-    def __init__(self) -> None:
-        self.owner = gl.message.sender_address
-        self.platform_name = "CodeVault"
-        self.platform_description = "A GenLayer private code marketplace."
-        self.listing_count = u256(0)
 `,
   task: `Add the first version of \`create_listing(self, title: str) -> str\`. It should create a listing ID from \`str(self.listing_count)\`, store the caller in \`listing_sellers[listing_id]\`, increment \`listing_count\`, and return the listing ID.`,
   hints: [

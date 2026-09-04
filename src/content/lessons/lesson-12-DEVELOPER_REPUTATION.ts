@@ -17,11 +17,21 @@ class CodeVault(gl.Contract):
     owner: Address
     platform_name: str
     platform_description: str
+    listing_count: u256
+    listing_titles: TreeMap[str, str]
+    listing_descriptions: TreeMap[str, str]
+    listing_sellers: TreeMap[str, Address]
+    listing_prices: TreeMap[str, u256]
+    listing_statuses: TreeMap[str, str]
+    listing_source_hashes: TreeMap[str, str]
+    listing_previews: TreeMap[str, str]
+    listing_ids: DynArray[str]
 
     def __init__(self) -> None:
         self.owner = gl.message.sender_address
         self.platform_name = "CodeVault"
         self.platform_description = "A GenLayer private code marketplace."
+        self.listing_count = u256(0)
 
     @gl.public.view
     def get_platform_name(self) -> str:
@@ -45,20 +55,7 @@ class CodeVault(gl.Contract):
         assert len(new_description) > 0, "Description cannot be empty"
         self.platform_description = new_description
 
-    listing_count: u256
-    listing_titles: TreeMap[str, str]
-    listing_descriptions: TreeMap[str, str]
-    listing_sellers: TreeMap[str, Address]
-    listing_prices: TreeMap[str, u256]
-    listing_statuses: TreeMap[str, str]
-    listing_source_hashes: TreeMap[str, str]
-    listing_previews: TreeMap[str, str]
 
-    def __init__(self) -> None:
-        self.owner = gl.message.sender_address
-        self.platform_name = "CodeVault"
-        self.platform_description = "A GenLayer private code marketplace."
-        self.listing_count = u256(0)
 
     @gl.public.write
     def create_listing(self, title: str, description: str, price: u256, source_hash: str, preview: str) -> str:
@@ -77,7 +74,6 @@ class CodeVault(gl.Contract):
         self.listing_count = self.listing_count + u256(1)
         return listing_id
 
-    listing_ids: DynArray[str]
 `,
   task: `Add \`get_listing_json(self, listing_id: str) -> str\` returning a JSON object with: id, title, description, seller (hex), price (str), status, preview. Do NOT include source_hash.`,
   hints: [

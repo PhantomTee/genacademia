@@ -19,7 +19,6 @@ class PredictX(gl.Contract):
     owner: Address
     platform_name: str
     platform_description: str
-
     market_questions: TreeMap[str, str]
     market_outcome_a: TreeMap[str, str]
     market_outcome_b: TreeMap[str, str]

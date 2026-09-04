@@ -17,11 +17,15 @@ class CodeVault(gl.Contract):
     owner: Address
     platform_name: str
     platform_description: str
+    listing_count: u256
+    listing_sellers: TreeMap[str, Address]
+    listing_prices: TreeMap[str, u256]
 
     def __init__(self) -> None:
         self.owner = gl.message.sender_address
         self.platform_name = "CodeVault"
         self.platform_description = "A GenLayer private code marketplace."
+        self.listing_count = u256(0)
 
     @gl.public.view
     def get_platform_name(self) -> str:
@@ -45,15 +49,7 @@ class CodeVault(gl.Contract):
         assert len(new_description) > 0, "Description cannot be empty"
         self.platform_description = new_description
 
-    listing_count: u256
-    listing_sellers: TreeMap[str, Address]
-    listing_prices: TreeMap[str, u256]
 
-    def __init__(self) -> None:
-        self.owner = gl.message.sender_address
-        self.platform_name = "CodeVault"
-        self.platform_description = "A GenLayer private code marketplace."
-        self.listing_count = u256(0)
 `,
   task: `Add \`listing_prices: TreeMap[str, u256]\`. Update \`create_listing\` so it also accepts \`price: u256\` and stores it in \`listing_prices[listing_id]\`.`,
   hints: [

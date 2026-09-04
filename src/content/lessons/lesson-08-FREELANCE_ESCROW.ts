@@ -17,11 +17,15 @@ class TrustLance(gl.Contract):
     owner: Address
     platform_name: str
     platform_description: str
+    job_count: u256
+    job_clients: TreeMap[str, Address]
+    job_budgets: TreeMap[str, u256]
 
     def __init__(self) -> None:
         self.owner = gl.message.sender_address
         self.platform_name = "TrustLance"
         self.platform_description = "A GenLayer freelance escrow platform."
+        self.job_count = u256(0)
 
     @gl.public.view
     def get_platform_name(self) -> str:
@@ -45,15 +49,7 @@ class TrustLance(gl.Contract):
         assert len(new_description) > 0, "Description cannot be empty"
         self.platform_description = new_description
 
-    job_count: u256
-    job_clients: TreeMap[str, Address]
-    job_budgets: TreeMap[str, u256]
 
-    def __init__(self) -> None:
-        self.owner = gl.message.sender_address
-        self.platform_name = "TrustLance"
-        self.platform_description = "A GenLayer freelance escrow platform."
-        self.job_count = u256(0)
 `,
   task: `Add \`job_budgets: TreeMap[str, u256]\` as a class-level field. Update \`create_job\` so it also accepts a \`budget: u256\` parameter and stores it in \`job_budgets[job_id]\`.`,
   hints: [
