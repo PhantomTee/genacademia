@@ -28,6 +28,8 @@ class GovMind(gl.Contract):
     against_votes: TreeMap[str, u256]
     has_voted: TreeMap[str, bool]
     proposal_ai_summaries: TreeMap[str, str]
+    voting_power: TreeMap[str, u256]
+    member_count: u256
 
     def __init__(self) -> None:
         self.owner = gl.message.sender_address
@@ -35,6 +37,8 @@ class GovMind(gl.Contract):
         self.dao_description = "An AI-governed decentralised autonomous organisation."
         self.proposal_count = u256(0)
         self.members[self.owner.as_hex] = True
+        self.voting_power[self.owner.as_hex] = u256(1)
+        self.member_count = u256(1)
 
     @gl.public.view
     def get_dao_name(self) -> str:
@@ -163,6 +167,53 @@ class GovMind(gl.Contract):
         result = json.dumps(result, sort_keys=True)
         self.proposal_ai_summaries[proposal_id] = result
         return result
+
+    @gl.public.write
+    def add_member(self, address_hex: str) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can add members"
+        assert not self.members.get(address_hex, False), "Already a member"
+
+        self.members[address_hex] = True
+        self.member_count = self.member_count + u256(1)
+
+    @gl.public.write
+    def set_voting_power(self, address_hex: str, power: u256) -> None:
+        assert gl.message.sender_address == self.owner, "Only owner can set voting power"
+        assert self.members.get(address_hex, False), "Address is not a member"
+
+        self.voting_power[address_hex] = power
+
+    @gl.public.view
+    def get_member_count(self) -> str:
+        return str(self.member_count)
+
+    @gl.public.view
+    def get_vote_tally(self, proposal_id: str) -> str:
+        assert proposal_id in self.proposal_titles, "Proposal not found"
+
+        return json.dumps({
+            "for_votes": str(self.for_votes.get(proposal_id, u256(0))),
+            "against_votes": str(self.against_votes.get(proposal_id, u256(0))),
+        }, sort_keys=True)
+
+    @gl.public.view
+    def get_proposal_ai_prompt(self, proposal_id: str) -> str:
+        assert proposal_id in self.proposal_titles, "Proposal not found"
+
+        return (
+            "Title: "
+            + self.proposal_titles[proposal_id]
+            + ". Description: "
+            + self.proposal_descriptions[proposal_id]
+            + ". For: "
+            + str(self.for_votes.get(proposal_id, u256(0)))
+            + ". Against: "
+            + str(self.against_votes.get(proposal_id, u256(0)))
+        )
+
+    @gl.public.view
+    def get_ai_summary(self, proposal_id: str) -> str:
+        return self.proposal_ai_summaries.get(proposal_id, "not analyzed yet")
 
     @gl.public.view
     def get_frontend_actions_json(self) -> str:

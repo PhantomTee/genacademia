@@ -27,7 +27,6 @@ class PredictX(gl.Contract):
     owner: Address
     platform_name: str
     platform_description: str
-
     market_questions: TreeMap[str, str]
     market_outcome_a: TreeMap[str, str]
     market_outcome_b: TreeMap[str, str]
@@ -36,12 +35,10 @@ class PredictX(gl.Contract):
     market_statuses: TreeMap[str, str]
     market_ids: DynArray[str]
     market_count: u256
-
     market_total_a: TreeMap[str, u256]
     market_total_b: TreeMap[str, u256]
     user_stakes_a: TreeMap[str, u256]
     user_stakes_b: TreeMap[str, u256]
-
     market_winning_outcome: TreeMap[str, str]
     market_resolution_reason: TreeMap[str, str]
     user_claimed: TreeMap[str, bool]
@@ -274,6 +271,22 @@ class PredictX(gl.Contract):
         self.user_claimed[claim_key] = True
 
         _Recipient(gl.message.sender_address).emit_transfer(value=payout)
+
+    @gl.public.view
+    def get_resolution_prompt(self, market_id: str, evidence: str) -> str:
+        assert market_id in self.market_questions, "Market not found"
+
+        return (
+            "You are resolving a prediction market. Question: "
+            + self.market_questions[market_id]
+            + ". Outcome A: "
+            + self.market_outcome_a[market_id]
+            + ". Outcome B: "
+            + self.market_outcome_b[market_id]
+            + ". Evidence: "
+            + evidence
+            + ". Return exactly one line in this format: A|reason or B|reason."
+        )
 
     @gl.public.view
     def get_frontend_actions_json(self) -> str:

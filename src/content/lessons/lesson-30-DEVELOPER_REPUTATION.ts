@@ -185,6 +185,42 @@ class CodeVault(gl.Contract):
         return result
 
     @gl.public.view
+    def get_listing_count(self) -> str:
+        return str(self.listing_count)
+
+    @gl.public.view
+    def get_purchase_status(self, listing_id: str) -> str:
+        return self.purchase_statuses.get(listing_id, "not purchased")
+
+    @gl.public.write
+    def refund_purchase(self, listing_id: str) -> None:
+        assert listing_id in self.listing_titles, "Listing not found"
+        assert gl.message.sender_address == self.purchase_buyers[listing_id], "Only buyer can refund"
+        assert self.purchase_statuses.get(listing_id, "") == "pending", "Purchase must be pending"
+        assert not self.seller_claimed.get(listing_id, False), "Already paid"
+
+        self.purchase_statuses[listing_id] = "refunded"
+
+        _Recipient(gl.message.sender_address).emit_transfer(value=self.purchase_escrow[listing_id])
+
+    @gl.public.view
+    def get_listing_ai_prompt(self, listing_id: str) -> str:
+        assert listing_id in self.listing_titles, "Listing not found"
+
+        return (
+            "Title: "
+            + self.listing_titles[listing_id]
+            + ". Description: "
+            + self.listing_descriptions[listing_id]
+            + ". Preview: "
+            + self.listing_previews[listing_id]
+        )
+
+    @gl.public.view
+    def get_ai_verdict(self, listing_id: str) -> str:
+        return self.listing_ai_verdicts.get(listing_id, "not evaluated yet")
+
+    @gl.public.view
     def get_frontend_actions_json(self) -> str:
         return json.dumps({
             "create": "create_listing(title, description, price, source_hash, preview)",

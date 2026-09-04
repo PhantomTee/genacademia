@@ -30,7 +30,6 @@ class CaseWise(gl.Contract):
     owner: Address
     court_name: str
     court_rules: str
-
     case_titles: TreeMap[str, str]
     case_claims: TreeMap[str, str]
     case_claimants: TreeMap[str, Address]
@@ -39,18 +38,14 @@ class CaseWise(gl.Contract):
     case_statuses: TreeMap[str, str]
     case_ids: DynArray[str]
     case_count: u256
-
     case_paid_amounts: TreeMap[str, u256]
     case_claimant_evidence: TreeMap[str, str]
     case_respondent_evidence: TreeMap[str, str]
-
     case_rulings: TreeMap[str, str]
     case_ruling_reasons: TreeMap[str, str]
-
     case_ai_rulings: TreeMap[str, str]
     case_ai_confidences: TreeMap[str, str]
     case_ai_reasons: TreeMap[str, str]
-
     case_appeal_reasons: TreeMap[str, str]
 
     def __init__(self) -> None:

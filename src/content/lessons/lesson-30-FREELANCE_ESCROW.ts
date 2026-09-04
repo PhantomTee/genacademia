@@ -36,6 +36,7 @@ class TrustLance(gl.Contract):
     job_escrow: TreeMap[str, u256]
     job_deliveries: TreeMap[str, str]
     freelancer_claimed: TreeMap[str, bool]
+    dispute_outcomes: TreeMap[str, str]
 
     def __init__(self) -> None:
         self.owner = gl.message.sender_address
@@ -178,7 +179,33 @@ class TrustLance(gl.Contract):
 
         result = gl.vm.run_nondet_unsafe(run, validate_result)
         result = json.dumps(result, sort_keys=True)
+        self.dispute_outcomes[job_id] = result
         return result
+
+    @gl.public.view
+    def get_job_count(self) -> str:
+        return str(self.job_count)
+
+    @gl.public.view
+    def get_escrow_balance(self, job_id: str) -> str:
+        return str(self.job_escrow.get(job_id, u256(0)))
+
+    @gl.public.view
+    def get_dispute_prompt(self, job_id: str, reason: str) -> str:
+        assert job_id in self.job_titles, "Job not found"
+
+        return (
+            "Job: "
+            + self.job_descriptions[job_id]
+            + ". Delivery: "
+            + self.job_deliveries.get(job_id, "no delivery ref")
+            + ". Reason: "
+            + reason
+        )
+
+    @gl.public.view
+    def get_dispute_outcome(self, job_id: str) -> str:
+        return self.dispute_outcomes.get(job_id, "no ruling yet")
 
     @gl.public.view
     def get_frontend_actions_json(self) -> str:
