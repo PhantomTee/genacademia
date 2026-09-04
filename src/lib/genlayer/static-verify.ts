@@ -42,6 +42,29 @@ function hasMethod(code: string, method: string): boolean {
   return new RegExp(`\\bdef\\s+${method}\\s*\\(`).test(code);
 }
 
+// The taught value-transfer pattern requires an EVM interface whose View/Write
+// bodies are `pass`. That is mandatory boilerplate, not an unfinished method,
+// so it must not be read as placeholder code.
+function stripEvmInterfaces(code: string): string {
+  const lines = code.split(/\r?\n/);
+  const kept: string[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trim() !== "@gl.evm.contract_interface") {
+      kept.push(lines[i]);
+      continue;
+    }
+
+    i++;
+    while (i < lines.length && !/^\s*class\s+\w+/.test(lines[i])) i++;
+    i++;
+    while (i < lines.length && (lines[i].trim() === "" || /^\s+\S/.test(lines[i]))) i++;
+    i--;
+  }
+
+  return kept.join("\n");
+}
+
 function methodHasDecorator(code: string, method: string, decorator: string): boolean {
   const lines = code.split(/\r?\n/);
 
@@ -118,7 +141,9 @@ export function runStaticVerification(
 
   addCheck(
     "No placeholder code",
-    !/\b(TODO|NotImplementedError|stub|placeholder)\b|^\s*pass\s*$/im.test(code),
+    !/\b(TODO|NotImplementedError|stub|placeholder)\b|^\s*pass\s*$/im.test(
+      stripEvmInterfaces(code)
+    ),
     "Placeholder code is still present.",
     "Replace placeholder text or `pass` statements with the real lesson logic."
   );
