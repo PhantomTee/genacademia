@@ -19,8 +19,11 @@ function parseDbUrl(url: string): pg.PoolConfig {
 }
 
 function createPrismaClient() {
-  const rawUrl = process.env.DATABASE_URL;
-  if (!rawUrl) throw new Error("DATABASE_URL is not set");
+  // Vercel's Supabase integration provides POSTGRES_URL; prefer it so a
+  // database connected through the dashboard works without hand-copying
+  // secrets. DATABASE_URL stays supported for local .env files.
+  const rawUrl = process.env.POSTGRES_URL ?? process.env.DATABASE_URL;
+  if (!rawUrl) throw new Error("POSTGRES_URL or DATABASE_URL must be set");
   const config = parseDbUrl(rawUrl);
   const pool = new pg.Pool(config);
   const adapter = new PrismaPg(pool);
